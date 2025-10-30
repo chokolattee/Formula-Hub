@@ -1,27 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const upload = require("../utils/multer");
-const {isAuthenticatedUser} = require('../middlewares/auth')
-const { registerUser,
+const {isAuthenticatedUser, authorizeRoles} = require('../middlewares/auth')
+const { 
+    registerUser,
     loginUser,
     forgotPassword,
     resetPassword,
     getUserProfile,
     updatePassword,
     updateProfile,
-
-
-
-
-
+    checkUser,
+    loginwithGoogle,
+    loginwithFacebook,
 } = require('../controllers/auth');
 
-router.post('/register', upload.single("avatar"), registerUser);
-router.post('/login', loginUser);
+// Check authenticated user
+router.get('/check', isAuthenticatedUser, checkUser);
+
+// Login with Firebase token
+router.post('/auth', loginUser);
+
+// Social login routes
+router.post('/auth/google', loginwithGoogle);
+router.post('/auth/facebook', loginwithFacebook);
+
+// Register new user
+router.post('/register', registerUser);
+
+// Password management
 router.post('/password/forgot', forgotPassword);
 router.put('/password/reset/:token', resetPassword);
-router.get('/me', isAuthenticatedUser, getUserProfile)
-router.put('/password/update', isAuthenticatedUser, updatePassword)
-router.put('/me/update', isAuthenticatedUser,  upload.single("avatar"), updateProfile)
+router.put('/password/update', isAuthenticatedUser, updatePassword);
+
+// User profile routes
+router.get('/me', isAuthenticatedUser, getUserProfile);
+router.put('/me/update', isAuthenticatedUser, upload.single("avatar"), updateProfile);
 
 module.exports = router;

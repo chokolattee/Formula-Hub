@@ -2,69 +2,174 @@ const User = require('../models/user');
 const crypto = require('crypto')
 const cloudinary = require('cloudinary')
 const sendEmail = require('../utils/sendEmail')
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const sendToken = require('../utils/jwtToken');
+
+const admin = require("firebase-admin");
+const fs = require("fs");
+
+const serviceAccount = JSON.parse(
+  fs.readFileSync("./firebase/serviceAccountKey.json", "utf8")
+);
+
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+/*Login & Register*/
+
+exports.checkUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+
+        return res.status(200).json({
+            success: true,
+            user
+        })
+    } catch(e) {
+        return res.status(500).json({
+            success: false,
+            message: "Server Error."
+        })
+    }
+}
+
+exports.loginwithGoogle = async (req,res) => {
+    try {
+        const { token } = req.body;
+        
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Token is required" });
+        }
+
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const { email, name } = decodedToken;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            const hashedPassword = await bcrypt.hash("google_oauth_secret", 10);
+            const [firstName, lastName] = name ? name.split(" ") : ["", ""];
+            const photoURL = decodedToken.picture || "default_avatar_url";
+        
+            user = await User.create({
+                email: email,
+                name: name || email,
+                password: hashedPassword,
+                first_name: firstName,
+                last_name: lastName || "",
+                avatar: [{ public_id: "google_oauth", url: photoURL }],
+            });
+        }
+
+        sendToken(user, 200, res);
+    } catch (e) {
+        console.log("Error in Google login: ", e.message);
+        res.status(500).json({ success: false, message: "Google login failed. Please try again." });
+    }
+}
+
+exports.loginwithFacebook = async (req, res) => {
+     try {
+        const { token } = req.body;
+        
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Token is required" });
+        }
+
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const { email, name } = decodedToken;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            const hashedPassword = await bcrypt.hash("facebook_oauth_secret", 10);
+            const [firstName, lastName] = name ? name.split(" ") : ["", ""];
+            const photoURL = decodedToken.picture || "default_avatar_url"; 
+        
+            user = await User.create({
+                email: email,
+                name: name || email,
+                password: hashedPassword,
+                first_name: firstName,
+                last_name: lastName || "",
+                avatar: [{ public_id: "facebook_oauth", url: photoURL }],
+            });
+        }
+
+        sendToken(user, 200, res);
+    } catch (e) {
+        console.log("Error in Facebook login: ", e.message);
+        res.status(500).json({ success: false, message: "Facebook login failed. Please try again." });
+    }
+}
 
 exports.registerUser = async (req, res, next) => {
-    const result = await cloudinary.v2.uploader.upload(req.body.avatar, {
-        folder: 'avatars',
-        width: 150,
-        crop: "scale"
-    }, (err, res) => {
-        console.log(err, res);
-    });
-    const { name, email, password, } = req.body;
-    const user = await User.create({
-        name,
-        email,
-        password,
-        avatar: {
-            public_id: result.public_id,
-            url: result.secure_url
-        },
-    })
-    //test token
-    const token = user.getJwtToken();
+     try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Email and password are required" 
+            });
+        }
 
-    return res.status(201).json({
-        success: true,
-        user,
-        token
-    })
-    // sendToken(user, 200, res)
+        // Check if user already exists
+        let user = await User.findOne({ email: email });
+        
+        if (user) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User already exists. Please login instead." 
+            });
+        }
+        
+        // Hash password and create user
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user = await User.create({
+            email: email,
+            password: hashedPassword
+        });
+        
+        // Send token
+        sendToken(user, 201, res);
+    } catch (e) {
+        console.log("Error in registering User: ", e.message);
+        res.status(500).json({ 
+            success: false, 
+            message: "Registration failed. Please try again."
+        });
+    }
 }
 
 exports.loginUser = async (req, res, next) => {
-    const { email, password } = req.body;
+   try {
+        const { token } = req.body;
 
-    // Checks if email and password is entered by user
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Please enter email & password' })
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Token is required" });
     }
 
+        // Verify the Firebase ID token
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const { email } = decodedToken;
 
-    // Finding user in database
+        // Check if the user exists in MongoDB
+        const user = await User.findOne({ email: email });
 
-    let user = await User.findOne({ email }).select('+password')
     if (!user) {
-        return res.status(401).json({ message: 'Invalid Email or Password' })
+            return res.status(404).json({ success: false, message: "User not found. Please register first." });
+        }
+
+        // Send a session token
+        sendToken(user, 200, res);
+    } catch (e) {
+        console.log("Error in login: ", e.message);
+        res.status(500).json({ success: false, message: "Login failed. Please try again." });
     }
-
-
-    // Checks if password is correct or not
-    const isPasswordMatched = await user.comparePassword(password);
-
-
-    if (!isPasswordMatched) {
-        return res.status(401).json({ message: 'Invalid Email or Password' })
-    }
-    const token = user.getJwtToken();
-
-    res.status(201).json({
-        success: true,
-        token,
-        user
-    });
-    //  user = await User.findOne({ email })
-    // sendToken(user, 200, res)
 }
 
 exports.forgotPassword = async (req, res, next) => {
@@ -133,6 +238,8 @@ exports.resetPassword = async (req, res, next) => {
     });
    
 }
+
+/*User Profile*/
 
 exports.getUserProfile = async (req, res, next) => {
     const user = await User.findById(req.user.id);

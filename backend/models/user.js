@@ -7,7 +7,6 @@ const crypto = require('crypto')
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: [true, 'Please enter your name'],
         maxLength: [30, 'Your name cannot exceed 30 characters']
     },
     email: {
@@ -24,12 +23,10 @@ const userSchema = new mongoose.Schema({
     },
     avatar: {
         public_id: {
-            type: String,
-            required: true
+            type: String
         },
         url: {
-            type: String,
-            required: true
+            type: String
         }
     },
     role: {

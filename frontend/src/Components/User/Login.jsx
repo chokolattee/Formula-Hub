@@ -9,6 +9,13 @@ import axios from 'axios';
 import { authenticate, getUser } from '../Utils/helpers';
 import Loader from '../Layout/Loader'
 import MetaData from '../Layout/MetaData';
+import { 
+  firebaseLogin, 
+  firebaseRegister, 
+  signInWithGoogle, 
+  signInWithFacebook 
+} from '../Firebase/auth';
+
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -30,67 +37,195 @@ const Login = () => {
         setError('');
     };
 
-    const login = async (email, password) => {
+    const loginAttempt = async () => {
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            setError('')
+            console.log("=== LOGIN ATTEMPT ===");
+            console.log("Email:", email);
+            console.log("Password length:", password.length);
+
+            const user = await firebaseLogin(email, password)
+            console.log("Firebase login successful!");
+            console.log("User UID:", user.uid);
+            console.log("User Email:", user.email);
+
+            const token = await user.getIdToken();
+            console.log("Token obtained, length:", token.length);
+
+            console.log("Sending token to backend...");
+            const res = await axios.post("http://localhost:8000/api/v1/auth", { token });
+            console.log("Backend response:", res.data);
+
+            if (res.data.success) {
+                console.log("Login successful!");
+                authenticate(res.data, () => navigate("/"))
+                return true;
+            } else {
+                setError(res.data.message || "Login failed")
+                return false;
             }
-            const { data } = await axios.post(`http://localhost:4001/api/v1/login`, { email, password }, config)
-            console.log(data)
-            authenticate(data, () => navigate("/"))
-        } catch (error) {
-            setError("Invalid user or password")
-            toast.error("invalid user or password", {
+        } catch (e) {
+            console.error("=== LOGIN ERROR ===");
+            console.error("Error code:", e.code);
+            console.error("Error message:", e.message);
+            console.error("Full error:", e);
+
+            let errorMessage = "Login failed. Please check your credentials.";
+
+            // Handle specific Firebase errors
+            if (e.code === 'auth/invalid-credential') {
+                errorMessage = "Invalid email or password. Please check your credentials or register first.";
+            } else if (e.code === 'auth/user-not-found') {
+                errorMessage = "No account found with this email. Please register first.";
+            } else if (e.code === 'auth/wrong-password') {
+                errorMessage = "Incorrect password. Please try again.";
+            } else if (e.code === 'auth/invalid-email') {
+                errorMessage = "Invalid email format.";
+            } else if (e.code === 'auth/too-many-requests') {
+                errorMessage = "Too many failed attempts. Please try again later.";
+            } else if (e.response?.data?.message) {
+                errorMessage = e.response.data.message;
+            }
+
+            setError(errorMessage);
+            toast.error(errorMessage, {
                 position: 'bottom-right'
-            })
+            });
+            return false;
         }
     }
 
-    const register = async (email, password) => {
+    const registerAttempt = async () => {
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-            const { data } = await axios.post(`http://localhost:4001/api/v1/register`, { email, password }, config)
+            setError('')
+            console.log("=== REGISTER ATTEMPT ===");
+
+            // Register with Firebase
+            const user = await firebaseRegister(email, password)
+            console.log("Firebase registration successful!");
+            console.log("User UID:", user.uid);
+
+            // Get token and send to backend
+            const token = await user.getIdToken();
+            
+            const res = await axios.post("http://localhost:8000/api/v1/register", { 
+                email, 
+                password,
+                token 
+            });
+
+            if (res.data.success) {
             toast.success("Registration successful! Please login.", {
                 position: 'bottom-right'
             })
             setFormActive('login')
             resetForm()
-        } catch (error) {
-            setError(error.response?.data?.message || "Registration failed")
-            toast.error(error.response?.data?.message || "Registration failed", {
+                return true;
+            } else {
+                setError(res.data.message || "Registration failed")
+                return false;
+            }
+        } catch (e) {
+            console.error("Registration error:", e)
+            let errorMessage = "Registration failed. Please try again."
+            
+            // Handle specific Firebase errors
+            if (e.code === 'auth/email-already-in-use') {
+                errorMessage = "This email is already registered. Please login instead.";
+            } else if (e.code === 'auth/weak-password') {
+                errorMessage = "Password should be at least 6 characters.";
+            } else if (e.code === 'auth/invalid-email') {
+                errorMessage = "Invalid email format.";
+            } else if (e.response?.data?.message) {
+                errorMessage = e.response.data.message;
+            }
+            
+            setError(errorMessage)
+            toast.error(errorMessage, {
                 position: 'bottom-right'
             })
+            return false;
         }
     }
 
-    const submitHandler = (e) => {
+    const submitHandler = async (e) => {
         e.preventDefault();
+
         if (!email || !password) {
             setError("Please enter both email and password")
             return;
         }
+
         setLoading(true)
         
         if (formActive === 'login') {
-            login(email, password)
+            const success = await loginAttempt()
+            if (success) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000)
+            }
+            setLoading(false)
         } else {
-            register(email, password)
+            await registerAttempt()
+            setLoading(false)
         }
         setLoading(false)
     }
 
     const loginWithGoogle = async () => {
-        toast.info("Google login not implemented yet", { position: 'bottom-right' })
+        try {
+            setLoading(true)
+            setError('')
+            const user = await signInWithGoogle()  
+            const token = await user.getIdToken();
+
+            const res = await axios.post("http://localhost:8000/api/v1/auth/google", { token });
+
+            if (res.data.success) {
+                authenticate(res.data, () => {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+            }
+        } catch (e) {
+            console.error("Google login error:", e)
+            const errorMessage = e.response?.data?.message || "Google login failed. Please try again."
+            setError(errorMessage)
+            toast.error(errorMessage, {
+                position: 'bottom-right'
+            });
+            setLoading(false)
+        }
     }
 
     const loginWithFacebook = async () => {
-        toast.info("Facebook login not implemented yet", { position: 'bottom-right' })
+        try {
+            setLoading(true)
+            setError('')
+            
+            const user = await signInWithFacebook()  // Note: using your typo name
+            const token = await user.getIdToken();
+
+            const res = await axios.post("http://localhost:8000/api/v1/auth/facebook", { token });
+
+            if (res.data.success) {
+                authenticate(res.data, () => {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+            }
+        } catch (e) {
+            console.error("Facebook login error:", e)
+            const errorMessage = e.response?.data?.message || "Facebook login failed. Please try again."
+            setError(errorMessage)
+            toast.error(errorMessage, {
+                position: 'bottom-right'
+            });
+            setLoading(false)
+        }
     }
 
     const resetForm = () => {
