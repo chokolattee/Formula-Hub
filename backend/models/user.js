@@ -10,7 +10,13 @@ const userSchema = mongoose.Schema({
     },
     password: {
         type: String,
-        required: true
+        required: false,  // Make it optional for OAuth users
+        select: false
+    },
+    authProvider: {
+        type: String,
+        enum: ['email', 'google', 'facebook', 'both'],
+        default: 'email'
     },
     role: {
         type: String,
@@ -62,9 +68,14 @@ const userSchema = mongoose.Schema({
 
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {
-        next()
+        return next();
     }
-    this.password = await bcrypt.hash(this.password, 10)
+    
+    // Only hash if password exists
+    if (this.password) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+    next();
 });
 
 userSchema.methods.getJwtToken = function () {
@@ -74,7 +85,8 @@ userSchema.methods.getJwtToken = function () {
 }
 
 userSchema.methods.comparePassword = async function (enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password)
+    if (!this.password) return false;
+    return await bcrypt.compare(enteredPassword, this.password);
 }
 
 userSchema.methods.getResetPasswordToken = function () {

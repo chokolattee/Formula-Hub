@@ -13,6 +13,7 @@ const {
     checkUser,
     loginwithGoogle,
     loginwithFacebook,
+    setPassword
 } = require('../controllers/auth');
 
 // Check authenticated user
@@ -32,6 +33,7 @@ router.post('/register', registerUser);
 router.post('/password/forgot', forgotPassword);
 router.put('/password/reset/:token', resetPassword);
 router.put('/password/update', isAuthenticatedUser, updatePassword);
+router.put('/password/set', isAuthenticatedUser, setPassword);
 
 // User profile routes
 router.get('/me', isAuthenticatedUser, getUserProfile);
