@@ -1,4 +1,4 @@
-import  {  useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from "react-router-dom";
 import MetaData from '../Layout/MetaData'
 import { toast } from 'react-toastify';
@@ -24,8 +24,8 @@ const NewPassword = () => {
                     'Content-Type': 'application/json'
                 }
             }
-            const { data } = await axios.put(`http://localhost:4001/api/v1/password/reset/${token}`, passwords, config)
-            
+            const { data } = await axios.put(`http://localhost:8000/api/v1/password/reset/${token}`, passwords, config)
+
             setSuccess(data.success)
         } catch (error) {
             console.log(error)

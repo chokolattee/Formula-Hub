@@ -17,34 +17,27 @@ const ForgotPassword = () => {
     const navigate = useNavigate()
 
     const forgotPassword = async (formData) => {
-        const config = {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        }
-        try {
-            const { data } = await axios.post(`http://localhost:4001/api/v1/password/forgot`, formData, config)
-            console.log(data.message)
-            
-            setLoading(false)
-            toast.success(data.message, {
-                position: 'bottom-center'
-            });
-            navigate('/login')
-        } catch (error) {
-            toast.error(error.response.data.message, {
-                position: 'top-right'
-            });
-        }
-    }
+  const config = { headers: { 'Content-Type': 'application/json' } };
+  try {
+    const { data } = await axios.post(
+      'http://localhost:8000/api/v1/password/forgot',
+      { email: formData.email }, 
+      config
+    );
+    toast.success(data.message, { position: 'bottom-center' });
+    navigate('/login');
+  } catch (error) {
+    toast.error(error.response.data.error || 'Something went wrong', {
+      position: 'top-right',
+    });
+  }
+};
 
+const submitHandler = (e) => {
+  e.preventDefault();
+  forgotPassword({ email }); 
+};
 
-    const submitHandler = (e) => {
-        e.preventDefault();
-        const formData = new FormData();
-        formData.set('email', email);
-        forgotPassword(formData)
-    }
 
     return (
         <>

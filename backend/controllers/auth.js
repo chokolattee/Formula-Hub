@@ -180,83 +180,157 @@ exports.loginUser = async (req, res, next) => {
 }
 
 exports.forgotPassword = async (req, res, next) => {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-        return res.status(404).json({ error: 'User not found with this email' })
-    }
-    
-    // Check if user has password-based auth
-    if (user.authProvider === 'google' || user.authProvider === 'facebook') {
-        return res.status(400).json({ 
-            error: 'This account uses OAuth login. Please login and set a password in your profile settings.' 
-        });
-    }
-    
-    // Check if user doesn't have a password yet
-    if (!user.password) {
-        return res.status(400).json({ 
-            error: 'No password set for this account. Please login and set a password in your profile settings.' 
-        });
-    }
-    
-    // Get reset token
-    const resetToken = user.getResetPasswordToken();
-    await user.save({ validateBeforeSave: false });
-    
-    // Create reset password url
-    const resetUrl = `${req.protocol}://localhost:5173/password/reset/${resetToken}`;
-    const message = `Your password reset token is as follow:\n\n${resetUrl}\n\nIf you have not requested this email, then ignore it.`
-    
-    try {
-        await sendEmail({
-            email: user.email,
-            subject: 'ShopIT Password Recovery',
-            message
-        })
+   const user = await User.findOne({ email: req.body.email }).select('+password +authProvider');
+  if (!user) {
+    return res.status(404).json({ error: 'User not found with this email.' });
+  }
 
-        res.status(200).json({
-            success: true,
-            message: `Email sent to: ${user.email}`
-        })
+  // Check for OAuth users
+  if (user.authProvider === 'google' || user.authProvider === 'facebook') {
+    return res.status(400).json({
+      error: 'This account uses OAuth login. Please log in and set a password in your profile settings.',
+    });
+  }
 
-    } catch (error) {
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpire = undefined;
-        await user.save({ validateBeforeSave: false });
-        return res.status(500).json({ error: error.message })
-    }
-}
+  // Check if password is missing
+  if (!user.password) {
+    return res.status(400).json({
+      error: 'No password set for this account. Please log in and set a password in your profile settings.',
+    });
+  }
 
-exports.resetPassword = async (req, res, next) => {
-    console.log(req.params.token)
-    // Hash URL token
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex')
-    const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() }
-    })
-    console.log(user)
+  // Generate reset token
+  const resetToken = user.getResetPasswordToken();
+  await user.save({ validateBeforeSave: false });
 
-    if (!user) {
-        return res.status(400).json({ message: 'Password reset token is invalid or has been expired' })
-    }
+  // Reset URL
+  const resetUrl = `${req.protocol}://localhost:5173/password/reset/${resetToken}`;
 
-    if (req.body.password !== req.body.confirmPassword) {
-        return res.status(400).json({ message: 'Password does not match' })
-    }
+  // ✅ Nicely formatted HTML email
+  const message = `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 8px; padding: 20px;">
+      <h2 style="text-align: center; color: #007bff;">FormulaHub Password Reset</h2>
+      <p>Hello ${user.name || 'User'},</p>
+      <p>You recently requested to reset your password for your FormulaHub account.</p>
+      <p>Click the button below to reset your password:</p>
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${resetUrl}" 
+           style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+          Reset Password
+        </a>
+      </div>
+      <p>If the button doesn’t work, you can also copy and paste the following link into your browser:</p>
+      <p style="word-break: break-all;">${resetUrl}</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+      <p style="font-size: 12px; color: #777;">If you didn’t request this password reset, you can safely ignore this email.</p>
+      <p style="font-size: 12px; color: #777;">© ${new Date().getFullYear()} FormulaHub. All rights reserved.</p>
+    </div>
+  `;
 
-    // Setup new password
-    user.password = req.body.password;
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'FormulaHub Password Recovery',
+      html: message, 
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Password reset email sent to: ${user.email}`,
+    });
+  } catch (error) {
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
-    await user.save();
-    
-    const token = user.getJwtToken();
-    return res.status(201).json({
-        success: true,
-        token,
-        user
-    });
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+
+exports.resetPassword = async (req, res, next) => {
+    try {
+        console.log(req.params.token)
+        // Hash URL token
+        const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex')
+        const user = await User.findOne({
+            resetPasswordToken,
+            resetPasswordExpire: { $gt: Date.now() }
+        })
+        console.log(user)
+
+        if (!user) {
+            return res.status(400).json({ message: 'Password reset token is invalid or has been expired' })
+        }
+
+        if (req.body.password !== req.body.confirmPassword) {
+            return res.status(400).json({ message: 'Password does not match' })
+        }
+
+        // Validate password length
+        if (req.body.password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters' })
+        }
+
+        // Get Firebase user by email and update password
+        try {
+            const firebaseUser = await admin.auth().getUserByEmail(user.email);
+            await admin.auth().updateUser(firebaseUser.uid, {
+                password: req.body.password
+            });
+            console.log('Firebase password updated successfully');
+        } catch (firebaseError) {
+            console.error('Firebase password update error:', firebaseError);
+            // If user doesn't exist in Firebase, create them
+            if (firebaseError.code === 'auth/user-not-found') {
+                try {
+                    await admin.auth().createUser({
+                        email: user.email,
+                        password: req.body.password,
+                        emailVerified: true
+                    });
+                    console.log('Firebase user created with new password');
+                } catch (createError) {
+                    console.error('Failed to create Firebase user:', createError);
+                    return res.status(500).json({ 
+                        message: 'Failed to update authentication system' 
+                    });
+                }
+            } else {
+                return res.status(500).json({ 
+                    message: 'Failed to update password in authentication system' 
+                });
+            }
+        }
+
+        // Setup new password in MongoDB
+        user.password = req.body.password;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+        
+        // Update authProvider if needed
+        if (user.authProvider === 'google' || user.authProvider === 'facebook') {
+            user.authProvider = 'both';
+        } else if (!user.authProvider) {
+            user.authProvider = 'email';
+        }
+        
+        await user.save();
+        
+        const token = user.getJwtToken();
+        return res.status(201).json({
+            success: true,
+            token,
+            user,
+            message: 'Password reset successfully'
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        return res.status(500).json({ 
+            message: 'Error resetting password',
+            error: error.message 
+        });
+    }
 }
 
 /*User Profile*/
@@ -460,6 +534,22 @@ exports.updatePassword = async (req, res, next) => {
             });
         }
 
+        // Update password in Firebase Authentication
+        try {
+            const firebaseUser = await admin.auth().getUserByEmail(user.email);
+            await admin.auth().updateUser(firebaseUser.uid, {
+                password: req.body.password
+            });
+            console.log('Firebase password updated successfully');
+        } catch (firebaseError) {
+            console.error('Firebase password update error:', firebaseError);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to update password in authentication system'
+            });
+        }
+
+        // Update password in MongoDB
         user.password = req.body.password;
         await user.save();
         
