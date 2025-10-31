@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { getUser, logout } from '../Utils/helpers'
 import { toast } from 'react-toastify'
 import { FaSearch, FaShoppingBag, FaUser, FaSignInAlt } from "react-icons/fa";
+import Dashboard from '../Admin/Dashboard';
 
 const Header = ({ cartItems }) => {
     const [user, setUser] = useState({})
@@ -24,6 +25,10 @@ const Header = ({ cartItems }) => {
         window.addEventListener('scroll', handleScroll)
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
+
+    if (user?.role === 'admin') {
+        return <Dashboard />
+    }
 
     return (
         <div id="navbar" className={`client-header ${isScrolled ? 'scrolled' : 'not-scrolled'}`}>
@@ -78,11 +83,11 @@ const Header = ({ cartItems }) => {
                                             <div className="dropdown-item-custom">Dashboard</div>
                                         </Link>
                                     )}
-                                    <Link to="/orders/me" onClick={() => setDropdownOpen(false)}>
-                                        <div className="dropdown-item-custom">Orders</div>
-                                    </Link>
                                     <Link to="/me" onClick={() => setDropdownOpen(false)}>
                                         <div className="dropdown-item-custom">Profile</div>
+                                    </Link>
+                                    <Link to="/orders/me" onClick={() => setDropdownOpen(false)}>
+                                        <div className="dropdown-item-custom">My Orders</div>
                                     </Link>
                                     <div className="dropdown-divider"></div>
                                     <Link to="/" onClick={() => { logoutHandler(); setDropdownOpen(false); }}>
@@ -235,7 +240,8 @@ const Header = ({ cartItems }) => {
 
                 .icon-link,
                 .login-icon-link {
-                    color: var(--text-light);
+                    color: white;
+                    background: transparent;
                     font-size: 20px;
                     cursor: pointer;
                     transition: all 0.3s ease;

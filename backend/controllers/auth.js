@@ -13,7 +13,6 @@ const serviceAccount = JSON.parse(
   fs.readFileSync("./firebase/serviceAccountKey.json", "utf8")
 );
 
-
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -50,14 +49,12 @@ exports.loginwithGoogle = async (req,res) => {
         let user = await User.findOne({ email });
 
         if (!user) {
-            const hashedPassword = await bcrypt.hash("google_oauth_secret", 10);
             const [firstName, lastName] = name ? name.split(" ") : ["", ""];
             const photoURL = decodedToken.picture || "default_avatar_url";
         
             user = await User.create({
                 email: email,
-                name: name || email,
-                password: hashedPassword,
+                password: "google_oauth_secret", // Will be hashed by pre-save hook
                 first_name: firstName,
                 last_name: lastName || "",
                 avatar: [{ public_id: "google_oauth", url: photoURL }],
@@ -85,14 +82,12 @@ exports.loginwithFacebook = async (req, res) => {
         let user = await User.findOne({ email });
 
         if (!user) {
-            const hashedPassword = await bcrypt.hash("facebook_oauth_secret", 10);
             const [firstName, lastName] = name ? name.split(" ") : ["", ""];
             const photoURL = decodedToken.picture || "default_avatar_url"; 
         
             user = await User.create({
                 email: email,
-                name: name || email,
-                password: hashedPassword,
+                password: "facebook_oauth_secret", // Will be hashed by pre-save hook
                 first_name: firstName,
                 last_name: lastName || "",
                 avatar: [{ public_id: "facebook_oauth", url: photoURL }],
@@ -127,11 +122,10 @@ exports.registerUser = async (req, res, next) => {
             });
         }
         
-        // Hash password and create user
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Create user - password will be hashed by pre-save hook
         user = await User.create({
             email: email,
-            password: hashedPassword
+            password: password // Don't hash here, let pre-save hook do it
         });
         
         // Send token
@@ -151,7 +145,7 @@ exports.loginUser = async (req, res, next) => {
 
         if (!token) {
             return res.status(400).json({ success: false, message: "Token is required" });
-    }
+        }
 
         // Verify the Firebase ID token
         const decodedToken = await admin.auth().verifyIdToken(token);
@@ -160,7 +154,7 @@ exports.loginUser = async (req, res, next) => {
         // Check if the user exists in MongoDB
         const user = await User.findOne({ email: email });
 
-    if (!user) {
+        if (!user) {
             return res.status(404).json({ success: false, message: "User not found. Please register first." });
         }
 
@@ -176,7 +170,6 @@ exports.forgotPassword = async (req, res, next) => {
     const user = await User.findOne({ email: req.body.email });
     if (!user) {
         return res.status(404).json({ error: 'User not found with this email' })
-
     }
     // Get reset token
     const resetToken = user.getResetPasswordToken();
@@ -201,7 +194,6 @@ exports.forgotPassword = async (req, res, next) => {
         user.resetPasswordExpire = undefined;
         await user.save({ validateBeforeSave: false });
         return res.status(500).json({ error: error.message })
-      
     }
 }
 
@@ -217,12 +209,10 @@ exports.resetPassword = async (req, res, next) => {
 
     if (!user) {
         return res.status(400).json({ message: 'Password reset token is invalid or has been expired' })
-        
     }
 
     if (req.body.password !== req.body.confirmPassword) {
         return res.status(400).json({ message: 'Password does not match' })
-
     }
 
     // Setup new password
@@ -236,7 +226,6 @@ exports.resetPassword = async (req, res, next) => {
         token,
         user
     });
-   
 }
 
 /*User Profile*/
@@ -252,19 +241,17 @@ exports.getUserProfile = async (req, res, next) => {
 }
 
 exports.updateProfile = async (req, res, next) => {
-
     const newUserData = {
-        name: req.body.name,
+        first_name: req.body.first_name,
+        last_name: req.body.last_name,
         email: req.body.email
     }
 
     // Update avatar
     if (req.body.avatar !== '') {
         let user = await User.findById(req.user.id)
-        // console.log(user)
         const image_id = user.avatar.public_id;
         const res = await cloudinary.v2.uploader.destroy(image_id);
-        // console.log("Res", res)
         const result = await cloudinary.v2.uploader.upload(req.body.avatar, {
             folder: 'avatars',
             width: 150,

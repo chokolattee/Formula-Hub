@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { getUser, logout } from '../Utils/helpers'
 
 const Sidebar = () => {
     return (
@@ -34,6 +35,10 @@ const Sidebar = () => {
 
                     <li>
                         <Link to="/admin/reviews"><i className="fa fa-star"></i> Reviews</Link>
+                    </li>
+
+                    <li>
+                        <a href="/" onClick={() => { logout(); window.location.reload(); }}><i className="fa fa-sign-out"></i> Logout</a>
                     </li>
 
                 </ul>

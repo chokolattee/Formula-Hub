@@ -12,7 +12,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import Home from './Components/Home';
 import ProductDetails from './Components/Product/ProductDetails';
 import Login from './Components/User/Login';
-import Register from './Components/User/Register';
 import ForgotPassword from './Components/User/ForgotPassword';
 import NewPassword from './Components/User/NewPassword';
 import Profile from './Components/User/Profile';
@@ -113,7 +112,6 @@ function App() {
           <Route path="/product/:id" element={<ProductDetails cartItems={state.cartItems} addItemToCart={addItemToCart} />} exact="true" />
           <Route path="/search/:keyword" element={<Home />} exact="true" />
           <Route path="/login" element={<Login />} exact="true" />
-          <Route path="/register" element={<Register exact="true" />} />
           <Route path="/password/forgot" element={<ForgotPassword />} exact="true" />
           <Route path="/password/reset/:token" element={<NewPassword />} exact="true" />
           <Route path="/me" element={<Profile />} exact="true" />
