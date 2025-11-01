@@ -26,6 +26,7 @@ import Dashboard from './Components/Admin/Dashboard';
 import ProductsList from './Components/Admin/ProductsList';
 import TeamsList from './Components/Admin/TeamsList';
 import UsersList from './Components/Admin/UsersList';
+import CategoriesList from './Components/Admin/CategoriesList';
 import NewProduct from './Components/Admin/NewProduct';
 import UpdateProduct from './Components/Admin/UpdateProduct';
 import OrdersList from './Components/Admin/OrdersList';
@@ -124,6 +125,7 @@ function App() {
           <Route path="/admin/order/:id" element={<ProcessOrder />} />
           <Route path="/admin/teams" element={<TeamsList />} />
           <Route path="/admin/users" element={<UsersList />} />
+          <Route path="/admin/categories" element={<CategoriesList />} />
         </Routes>
       </Router>
       <Footer />

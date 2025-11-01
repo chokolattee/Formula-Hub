@@ -3,7 +3,7 @@ import '../../../Styles/Modal.css';
 import TextField from '@mui/material/TextField';
 import { Carousel } from 'react-responsive-carousel';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-import { Paper, Button, colors } from '@mui/material';
+import { Paper, Button } from '@mui/material';
 import { FaArrowAltCircleRight, FaArrowAltCircleLeft } from "react-icons/fa";
 
 const CreateModal = forwardRef(({
@@ -24,10 +24,23 @@ const CreateModal = forwardRef(({
             ref={ref}  
             className='modal-background'
             onClick={closeModals}
+            style={{ 
+                zIndex: 999,
+                position: 'fixed',
+                top: 0,
+                left: '300px',
+                right: 0,
+                bottom: 0,
+                width: 'calc(100% - 300px)'
+            }}
         >
             <div
                 className="modal-container"
                 onClick={(e) => e.stopPropagation()}
+                style={{ 
+                    zIndex: 999,
+                    position: 'relative'
+                }}
             >
                 <h2>Create New {title}</h2>
                 <p>Fill out the following fields to create a new {content}</p>
@@ -64,6 +77,11 @@ const CreateModal = forwardRef(({
                                             fullWidth
                                         />
                                     </div>
+                                </div>
+                            ) : field.type === 'custom' ? (
+                                // Handle custom components (like the team selector)
+                                <div key={field.name} className="input-group">
+                                    {field.customComponent}
                                 </div>
                             ) : field.type === 'text' || field.type === 'textarea' ? (
                                 <div key={field.name} className="input-group">

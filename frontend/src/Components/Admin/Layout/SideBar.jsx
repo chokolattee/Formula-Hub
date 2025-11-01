@@ -14,7 +14,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     const crudRoutes = [
       '/admin/products',
       '/admin/categories',
-      '/admin/types',
       '/admin/teams',
     ];
     if (crudRoutes.includes(location.pathname)) {
@@ -109,11 +108,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 <li className={isActive('/admin/categories') ? 'active' : ''}>
                   <Link to="/admin/categories" onClick={handleLinkClick}>
                     <i className="fa fa-tags"></i> Categories
-                  </Link>
-                </li>
-                <li className={isActive('/admin/types') ? 'active' : ''}>
-                  <Link to="/admin/types" onClick={handleLinkClick}>
-                    <i className="fa fa-list-alt"></i> Types
                   </Link>
                 </li>
                 <li className={isActive('/admin/teams') ? 'active' : ''}>

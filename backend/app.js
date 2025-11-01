@@ -7,6 +7,7 @@ const auth = require('./routes/auth');
 const order = require('./routes/order');
 const team = require('./routes/team');
 const user = require('./routes/user');
+const category = require('./routes/category');
 
 
 app.use(express.json({limit:'50mb'}));
@@ -18,6 +19,7 @@ app.use('/api/v1', auth);
 app.use('/api/v1', order);
 app.use('/api/v1', team);
 app.use('/api/v1', user);
+app.use('/api/v1', category);
 
 
 module.exports = app
