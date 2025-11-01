@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { getUser, logout } from '../Utils/helpers'
 import { toast } from 'react-toastify'
 import { FaSearch, FaShoppingBag, FaUser, FaSignInAlt } from "react-icons/fa";
-import Dashboard from '../Admin/Dashboard';
+import Sidebar from '../Admin/Layout/SideBar';
 
 const Header = ({ cartItems }) => {
     const [user, setUser] = useState({})
@@ -27,7 +27,7 @@ const Header = ({ cartItems }) => {
     }, [])
 
     if (user?.role === 'admin') {
-        return <Dashboard />
+        return <Sidebar />
     }
 
     return (

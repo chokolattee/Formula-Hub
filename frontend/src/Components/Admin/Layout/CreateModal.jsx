@@ -1,0 +1,165 @@
+import React, { forwardRef } from 'react';
+import '../../../Styles/Modal.css';
+import TextField from '@mui/material/TextField';
+import { Carousel } from 'react-responsive-carousel';
+import 'react-responsive-carousel/lib/styles/carousel.min.css';
+import { Paper, Button, colors } from '@mui/material';
+import { FaArrowAltCircleRight, FaArrowAltCircleLeft } from "react-icons/fa";
+
+const CreateModal = forwardRef(({
+    setOpenModal, 
+    modalData: { title, content, fields }, 
+    handleSubmit, 
+    imagesPreview, 
+    setImagesPreview
+}, ref) => {
+
+    const closeModals = () => {
+        setImagesPreview([]);
+        setOpenModal(false);
+    };
+
+    return (
+        <div
+            ref={ref}  
+            className='modal-background'
+            onClick={closeModals}
+        >
+            <div
+                className="modal-container"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <h2>Create New {title}</h2>
+                <p>Fill out the following fields to create a new {content}</p>
+                <div className="main-area">
+                    <form className="crud-form" onSubmit={handleSubmit}>
+                        {fields.map((field, index) => (
+                            field.col ? (
+                                <div key={index} className="input-group-col">
+                                    <div className="col">
+                                        <TextField
+                                            id={`outlined-${field.name}`}
+                                            label={field.label}
+                                            variant="outlined"
+                                            type={field.type}
+                                            name={field.name}
+                                            placeholder={field.placeholder}
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            required={field.required}
+                                            fullWidth
+                                        />
+                                    </div>
+                                    <div className="col" key={field.name2}>
+                                        <TextField
+                                            id={`outlined-${field.name2}`}
+                                            label={field.label2}
+                                            variant="outlined"
+                                            type={field.type2}
+                                            name={field.name2}
+                                            placeholder={field.placeholder2}
+                                            value={field.value2}
+                                            onChange={field.onChange2}
+                                            required={field.required2}
+                                            fullWidth
+                                        />
+                                    </div>
+                                </div>
+                            ) : field.type === 'text' || field.type === 'textarea' ? (
+                                <div key={field.name} className="input-group">
+                                    <TextField
+                                        id={`outlined-${field.name}`}
+                                        label={field.label}
+                                        variant="outlined"
+                                        type={field.type}
+                                        name={field.name}
+                                        placeholder={field.placeholder}
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        required={field.required}
+                                        className={field.className}
+                                        fullWidth
+                                        multiline={field.type === 'textarea'}
+                                        rows={field.type === 'textarea' ? 4 : 1}
+                                    />
+                                </div>
+                            ) : field.type === 'file' ? (
+                                <div key={field.name} className="input-group">
+                                    <label>{field.label}</label>
+                                    <input
+                                        type={field.type}
+                                        name={field.name}
+                                        onChange={field.onChange}
+                                        className={field.className}
+                                        multiple
+                                        accept="image/*"
+                                    />
+                                </div>
+                            ) : null
+                        ))}
+                        <div className="form-control">
+                            <span className='secondary-button' onClick={closeModals}>Cancel</span>
+                            <button className='prime-button' type="submit">Submit</button>
+                        </div>
+                    </form>
+
+                    <div className="carousel-container">
+                        {imagesPreview && imagesPreview.length > 0 ? (
+                            <Carousel
+                                className='custom-carousel'
+                                renderArrowNext={(onClickHandler, hasNext, label) =>
+                                    hasNext && (
+                                        <button type="button" onClick={onClickHandler} title={label} style={{
+                                            position: 'absolute',
+                                            zIndex: 2,
+                                            top: 'calc(50% - 15px)',
+                                            right: 15,
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <FaArrowAltCircleRight style={{ color: 'var(--primary-color)', fontSize: '30px' }}/>
+                                        </button>
+                                    )
+                                }
+                                renderArrowPrev={(onClickHandler, hasPrev, label) =>
+                                    hasPrev && (
+                                        <button type="button" onClick={onClickHandler} title={label} style={{
+                                            position: 'absolute',
+                                            zIndex: 2,
+                                            top: 'calc(50% - 15px)',
+                                            left: 15,
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <FaArrowAltCircleLeft style={{ color: 'var(--primary-color)', fontSize: '30px' }}/>
+                                        </button>
+                                    )
+                                }
+                                showThumbs={false}
+                                showStatus={false}
+                            >
+                                {imagesPreview.map((img, idx) => (
+                                    <div className="carousel-img__container" key={idx}>
+                                        <div className="img-container">
+                                            <img src={img} alt={`Preview ${idx + 1}`} className="mt-3 mr-2" width="55" height="52" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </Carousel>
+                        ) : (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                <p>No images selected</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+CreateModal.displayName = 'CreateModal';
+
+export default CreateModal;

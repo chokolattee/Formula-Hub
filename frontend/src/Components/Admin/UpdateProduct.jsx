@@ -1,6 +1,6 @@
 import React, {  useState, useEffect } from 'react'
 import MetaData from '../Layout/MetaData'
-import Sidebar from './SideBar'
+import Sidebar from './Layout/SideBar'
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';

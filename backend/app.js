@@ -5,6 +5,7 @@ const cors = require('cors')
 const products = require('./routes/product');
 const auth = require('./routes/auth');
 const order = require('./routes/order');
+const team = require('./routes/team');
 
 
 
@@ -15,6 +16,7 @@ app.use(cors());
 app.use('/api/v1', products);
 app.use('/api/v1', auth);
 app.use('/api/v1', order);
+app.use('/api/v1', team);
 
 
 

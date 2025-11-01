@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { MDBDataTable } from 'mdbreact'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
+import Sidebar from './Layout/SideBar'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { DataGrid, } from '@mui/x-data-grid'

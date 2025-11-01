@@ -2,7 +2,7 @@ import React, {  useState, useEffect } from 'react'
 import { Link, useParams, useNavigate,  } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
+import Sidebar from './Layout/SideBar'
 
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';

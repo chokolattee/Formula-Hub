@@ -15,8 +15,6 @@ import Login from './Components/User/Login';
 import ForgotPassword from './Components/User/ForgotPassword';
 import NewPassword from './Components/User/NewPassword';
 import Profile from './Components/User/Profile';
-import UpdatePassword from './Components/User/UpdatePassword';
-import UpdateProfile from './Components/User/UpdateProfile'
 import Cart from './Components/Cart/Cart';
 import Shipping from './Components/Cart/Shipping';
 import ConfirmOrder from './Components/Cart/ConfirmOrder';
@@ -26,6 +24,7 @@ import ListOrders from './Components/Order/ListOrders';
 import OrderDetails from './Components/Order/OrderDetails';
 import Dashboard from './Components/Admin/Dashboard';
 import ProductsList from './Components/Admin/ProductsList';
+import TeamsList from './Components/Admin/TeamsList';
 import NewProduct from './Components/Admin/NewProduct';
 import UpdateProduct from './Components/Admin/UpdateProduct';
 import OrdersList from './Components/Admin/OrdersList';
@@ -44,7 +43,6 @@ function App() {
   })
 
   const addItemToCart = async (id, quantity) => {
-    // console.log(id, quantity)
     try {
       const { data } = await axios.get(`${import.meta.env.VITE_API}/product/${id}`)
       const item = {
@@ -57,42 +55,35 @@ function App() {
       }
 
       const isItemExist = state.cartItems.find(i => i.product === item.product)
+      
+      // Fix: Single state update instead of multiple
+      const newCartItems = isItemExist 
+        ? state.cartItems.map(i => i.product === item.product ? item : i)
+        : [...state.cartItems, item];
 
       setState({
         ...state,
-        cartItems: [...state.cartItems, item]
+        cartItems: newCartItems
       })
-      if (isItemExist) {
-        setState({
-          ...state,
-          cartItems: state.cartItems.map(i => i.product === isItemExist.product ? item : i)
-        })
-      }
-      else {
-        setState({
-          ...state,
-          cartItems: [...state.cartItems, item]
-        })
-      }
 
       toast.success('Item Added to Cart', {
         position: 'bottom-right'
       })
 
     } catch (error) {
-      toast.error(error, {
+      toast.error(error.message || 'Failed to add item to cart', {
         position: 'top-left'
       });
-
     }
-
   }
+
   const removeItemFromCart = async (id) => {
+    const newCartItems = state.cartItems.filter(i => i.product !== id);
     setState({
       ...state,
-      cartItems: state.cartItems.filter(i => i.product !== id)
+      cartItems: newCartItems
     })
-    localStorage.setItem('cartItems', JSON.stringify(state.cartItems))
+    localStorage.setItem('cartItems', JSON.stringify(newCartItems))
   }
 
   const saveShippingInfo = async (data) => {
@@ -115,8 +106,6 @@ function App() {
           <Route path="/password/forgot" element={<ForgotPassword />} exact="true" />
           <Route path="/password/reset/:token" element={<NewPassword />} exact="true" />
           <Route path="/me" element={<Profile />} exact="true" />
-          <Route path="/me/update" element={<UpdateProfile />} exact="true" />
-          <Route path="/password/update" element={<UpdatePassword />} />
           <Route path="/cart" element={<Cart cartItems={state.cartItems} addItemToCart={addItemToCart} removeItemFromCart={removeItemFromCart} />} exact="true" />
           <Route path="/shipping" element={<Shipping shipping={state.shippingInfo} saveShippingInfo={saveShippingInfo} />} />
           <Route path="/confirm" element={<ConfirmOrder cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} />
@@ -124,23 +113,16 @@ function App() {
           <Route path="/success" element={<OrderSuccess />} />
           <Route path="/orders/me" element={<ListOrders />} />
           <Route path="/order/:id" element={<OrderDetails />} />
+          
+          {/* Admin Routes */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin/products" element={<ProductsList />} />
           <Route path="/admin/product" element={<NewProduct />} />
-          <Route
-            path="/admin/product/:id"
-            element={<UpdateProduct />} />
-
-          <Route
-            path="/admin/orders"
-            element={<OrdersList />}
-
-          />
-          <Route
-            path="/admin/order/:id"
-            element={<ProcessOrder />} />
+          <Route path="/admin/product/:id" element={<UpdateProduct />} />
+          <Route path="/admin/orders" element={<OrdersList />} />
+          <Route path="/admin/order/:id" element={<ProcessOrder />} />
+          <Route path="/admin/teams" element={<TeamsList />} />
         </Routes>
-
       </Router>
       <Footer />
       <ToastContainer />

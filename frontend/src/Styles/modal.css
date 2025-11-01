@@ -1,0 +1,569 @@
+/* F1 Racing Modal Styles */
+:root {
+    --f1-red: #DC0000;
+    --f1-dark-red: #A00000;
+    --f1-black: #15151E;
+    --f1-dark-gray: #2A2A2A;
+    --f1-light-gray: #E5E5E5;
+    --f1-white: #FFFFFF;
+    --f1-accent: #FF1E1E;
+    --f1-border: #3a3a4a;
+    --f1-text-light: #e5e5e5;
+}
+
+.modal-background {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    z-index: 2000; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 50px;
+}
+
+.modal-container {
+    display: block;
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    padding: 50px;
+    border-radius: 12px;
+    font-weight: 300;
+    width: 1000px;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    padding: 35px;
+    animation: drop 0.6s forwards; 
+    box-shadow: 
+        0 10px 50px rgba(220, 0, 0, 0.5),
+        0 0 100px rgba(220, 0, 0, 0.3),
+        inset 0 0 0 2px var(--f1-red);
+    border: 3px solid var(--f1-red);
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to right, transparent, var(--f1-red), var(--f1-accent), var(--f1-red), transparent);
+}
+
+.crud-form {
+    width: 50%;
+}
+
+.modal-container .main-area {
+    width: 100%;
+    display: flex;
+    min-height: 350px;
+    gap: 50px;
+}
+
+.modal-container h2 {
+    font-size: 28px;
+    line-height: 32px;
+    margin-bottom: 15px;
+    color: var(--f1-white);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 800;
+    font-family: 'Bebas Neue', sans-serif;
+    text-shadow: 2px 2px 0 var(--f1-red);
+}
+
+.modal-container p {
+    font-size: 16px;
+    line-height: 22px;
+    color: var(--f1-light-gray);
+    margin-bottom: 20px;
+}
+
+.content {
+    min-height: 100%;
+    height: 100%;
+    background: var(--f1-black);
+    position: relative;
+    z-index: 0;
+}
+
+.content h1 {
+    padding: 75px 0 30px 0;
+    text-align: center;
+    font-size: 30px;
+    line-height: 30px;
+    color: var(--f1-white);
+}
+
+.content .buttons {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0;
+    text-align: center;
+}
+
+.input-group {
+    margin: 13px 0px;
+}
+
+.input-group label {
+    color: var(--f1-white);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 13px;
+}
+
+.input-group select,
+.input-group input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--f1-border);
+    border-radius: 6px;
+    color: var(--f1-white);
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.input-group select:focus,
+.input-group input[type="file"]:focus {
+    outline: none;
+    border-color: var(--f1-red);
+    box-shadow: 0 0 15px rgba(220, 0, 0, 0.3);
+}
+
+.input-group select option {
+    background: var(--f1-black);
+    color: var(--f1-white);
+}
+
+.input-group-col {
+    display: flex;
+    gap: 15px;
+    margin: 13px 0;
+}
+
+.input-group-col .col {
+    flex: 1;
+}
+
+.MuiFormControl-root {
+    width: 100%;
+}
+
+/* MUI TextField Styling for F1 Theme */
+.MuiOutlinedInput-root {
+    color: var(--f1-white) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+    border-color: var(--f1-border) !important;
+    border-width: 2px !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: var(--f1-red) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: var(--f1-red) !important;
+    box-shadow: 0 0 15px rgba(220, 0, 0, 0.3);
+}
+
+.MuiInputLabel-root {
+    color: var(--f1-light-gray) !important;
+    font-weight: 600 !important;
+}
+
+.MuiInputLabel-root.Mui-focused {
+    color: var(--f1-red) !important;
+}
+
+.MuiInputBase-input {
+    color: var(--f1-white) !important;
+}
+
+.form-control {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.prime-button,
+.secondary-button {
+    padding: 12px 30px;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    font-size: 14px;
+}
+
+.prime-button {
+    background: linear-gradient(135deg, var(--f1-red) 0%, var(--f1-dark-red) 100%);
+    color: var(--f1-white);
+    box-shadow: 0 4px 15px rgba(220, 0, 0, 0.4);
+}
+
+.prime-button:hover {
+    background: linear-gradient(135deg, var(--f1-accent) 0%, var(--f1-red) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(220, 0, 0, 0.6);
+}
+
+.secondary-button {
+    background: transparent;
+    color: var(--f1-light-gray);
+    border: 2px solid var(--f1-border);
+}
+
+.secondary-button:hover {
+    background: var(--f1-border);
+    color: var(--f1-white);
+    border-color: var(--f1-white);
+}
+
+.content .buttons .button {
+    display: inline-block;
+    text-align: center;
+    padding: 10px 15px;
+    margin: 10px;
+    background-color: var(--f1-dark-gray);
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(220, 0, 0, 0.3);
+    cursor: pointer;
+    color: var(--f1-white);
+    border: 2px solid var(--f1-red);
+    transition: all 0.3s ease;
+}
+
+.content .buttons .button:hover {
+    color: white;
+    background: var(--f1-red);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(220, 0, 0, 0.5);
+}
+
+.modal-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.modal-exit-active {
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 300ms, transform 300ms;
+}
+
+@keyframes drop {
+    0% {
+        height: 550px;
+        transform: translateY(-500px) scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        min-height: 300px;
+        transform: translateY(10px) scale(1.02);
+    } 
+    100% {
+        height: 550px;
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes drop2 {
+    0% {
+        height: 600px;
+        transform: translateY(-500px) scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        min-height: 300px;
+        transform: translateY(10px) scale(1.02);
+    } 
+    100% {
+        height: 600px;
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-container-portrait {
+    height: 600px;
+    width: 520px;
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    animation: drop2 .6s ease;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 
+        0 10px 50px rgba(220, 0, 0, 0.5),
+        0 0 100px rgba(220, 0, 0, 0.3);
+    border: 3px solid var(--f1-red);
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-container-portrait::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to right, transparent, var(--f1-red), var(--f1-accent), var(--f1-red), transparent);
+}
+
+.display-modal__img-container {
+    width: 100%;
+    height: 300px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid var(--f1-red);
+    box-shadow: 0 5px 20px rgba(220, 0, 0, 0.3);
+    margin-bottom: 20px;
+}
+
+.carousel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 80%;
+    margin: auto;
+}
+
+.carousel-container {
+    width: 50%;
+    max-height: 350px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.carousel-img__container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+}
+
+.carousel-img__container .img-container {
+    height: 300px;
+    width: 300px;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; 
+    border-radius: 10px;
+    filter: drop-shadow(0 0 10px rgba(220, 0, 0, 0.3));
+}
+
+.carousel-image {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: cover; 
+    border-radius: 10px;
+}
+
+.carousel-button {
+    background: transparent;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--f1-red);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.carousel-button:hover {
+    color: var(--f1-accent);
+    transform: translateY(-50%) scale(1.2);
+}
+
+.carousel-button:first-of-type {
+    left: 10px;
+}
+
+.carousel-button:last-of-type {
+    right: 10px;
+}
+
+.display-modal__img-container {
+    width: 100%;
+    max-width: 600px;
+    height: 400px; 
+    overflow: hidden; 
+    position: relative;
+    margin: auto;
+}
+
+.custom-carousel {
+    height: 100%;
+    background: var(--f1-dark-gray);
+}
+
+.custom-carousel img {
+    width: 100%; 
+    height: auto; 
+    object-fit: cover;
+}
+
+.modal-container-portrait .detail-container {
+    margin: 12px 0px;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--f1-red);
+    border-radius: 4px;
+    color: var(--f1-light-gray);
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.modal-container-portrait .detail-container:hover {
+    background: rgba(220, 0, 0, 0.1);
+    transform: translateX(5px);
+}
+
+.modal-container__inventory {
+    height: 600px;
+    width: 1200px;
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    box-shadow: 
+        0 10px 50px rgba(220, 0, 0, 0.5),
+        0 0 100px rgba(220, 0, 0, 0.3);
+    border: 3px solid var(--f1-red);
+    border-radius: 12px;
+    padding: 35px;
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-container__inventory::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to right, transparent, var(--f1-red), var(--f1-accent), var(--f1-red), transparent);
+}
+
+/* Carousel Navigation Button Overrides */
+.MuiIconButton-root {
+    color: var(--f1-red) !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    border: 2px solid var(--f1-red) !important;
+}
+
+.MuiIconButton-root:hover {
+    background: rgba(220, 0, 0, 0.2) !important;
+    transform: scale(1.1);
+}
+
+/* Review Modal Styles */
+.review-modal {
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    padding: 35px;
+    border-radius: 12px;
+    width: 500px;
+    box-shadow: 
+        0 10px 50px rgba(220, 0, 0, 0.5),
+        0 0 100px rgba(220, 0, 0, 0.3);
+    border: 3px solid var(--f1-red);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.review-modal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to right, transparent, var(--f1-red), var(--f1-accent), var(--f1-red), transparent);
+}
+
+.review-field {
+    width: 100%;
+}
+
+.review-field textarea {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--f1-border);
+    border-radius: 6px;
+    color: var(--f1-white);
+    font-size: 14px;
+    min-height: 100px;
+    resize: vertical;
+    transition: all 0.3s ease;
+}
+
+.review-field textarea:focus {
+    outline: none;
+    border-color: var(--f1-red);
+    box-shadow: 0 0 15px rgba(220, 0, 0, 0.3);
+}
+
+.review-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}
+
+.f1-delete-button {
+    background: linear-gradient(135deg, #2A2A2A 0%, #15151E 100%) !important;
+    border: 2px solid var(--f1-red) !important;
+}
+
+.f1-delete-button:hover {
+    background: linear-gradient(135deg, var(--f1-red) 0%, var(--f1-dark-red) 100%) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .modal-container {
+        width: 90%;
+        height: auto;
+    }
+
+    .modal-container .main-area {
+        flex-direction: column;
+    }
+
+    .crud-form,
+    .carousel-container {
+        width: 100%;
+    }
+}

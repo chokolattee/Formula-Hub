@@ -1,6 +1,14 @@
 import React from 'react'
+import { getUser } from '../Utils/helpers'
 
 const Footer = () => {
+    const user = getUser();
+    const isAdmin = user?.role === 'admin';
+
+    if (isAdmin) {
+        return null;
+    }
+
     return (
         <>
             <footer className="py-5 mt-5" style={{
