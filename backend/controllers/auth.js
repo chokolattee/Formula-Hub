@@ -153,31 +153,43 @@ exports.registerUser = async (req, res, next) => {
 }
 
 exports.loginUser = async (req, res, next) => {
-   try {
-        const { token } = req.body;
+  try {
+    const { token } = req.body;
 
-        if (!token) {
-            return res.status(400).json({ success: false, message: "Token is required" });
-        }
-
-        // Verify the Firebase ID token
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        const { email } = decodedToken;
-
-        // Check if the user exists in MongoDB
-        const user = await User.findOne({ email: email });
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found. Please register first." });
-        }
-
-        // Send a session token
-        sendToken(user, 200, res);
-    } catch (e) {
-        console.log("Error in login: ", e.message);
-        res.status(500).json({ success: false, message: "Login failed. Please try again." });
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Token is required" });
     }
-}
+
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const { email } = decodedToken;
+
+    const user = await User.findOne({ email: email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please register first."
+      });
+    }
+
+    if (user.status === "deactivated") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated. Please contact admin."
+      });
+    }
+
+    sendToken(user, 200, res);
+  } catch (e) {
+    console.log("Error in login: ", e.message);
+    res.status(500).json({
+      success: false,
+      message: "Login failed. Please try again."
+    });
+  }
+};
+
 
 exports.forgotPassword = async (req, res, next) => {
    const user = await User.findOne({ email: req.body.email }).select('+password +authProvider');

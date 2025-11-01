@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../../Utils/helpers';
 import '../../../Styles/sidebar.css';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [expandedMenus, setExpandedMenus] = useState({ crud: false });
 
   const isActive = (path) => location.pathname === path;
@@ -23,6 +24,38 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
   const handleLinkClick = () => {
     if (window.innerWidth <= 992) setIsOpen(false);
+  };
+
+  const handleLogout = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Call the logout helper function
+      await logout();
+      
+      // Clear all possible authentication data
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      
+      // Clear cookies if you're using them
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Redirect to home page
+      window.location.href = '/';
+      // Alternative: navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout even if there's an error
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -116,11 +149,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <li>
               <a
                 href="/"
-                onClick={(e) => {
-                  e.preventDefault();
-                  logout();
-                  window.location.href = '/';
-                }}
+                onClick={handleLogout}
+                style={{ cursor: 'pointer' }}
               >
                 <i className="fa fa-sign-out"></i> Logout
               </a>
