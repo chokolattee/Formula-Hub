@@ -346,3 +346,58 @@ exports.deleteProduct = async (request, response) => {
         });
     }
 };
+
+exports.getProductDetails = async (request, response) => {
+    try {
+        const { id } = request.params;
+
+        // Validate MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return response.status(400).json({ 
+                success: false, 
+                message: "Invalid Product ID format." 
+            });
+        }
+
+        const product = await Product.findById(id)
+            .populate('category', 'name description')
+            .populate('team', 'name description')
+            .exec();
+
+        if (!product) {
+            return response.status(404).json({ 
+                success: false, 
+                message: "Product not found." 
+            });
+        }
+
+        // Format the response to ensure images are properly included
+        const formattedProduct = {
+            _id: product._id,
+            name: product.name,
+            price: product.price,
+            description: product.description,
+            ratings: product.ratings || 0,
+            numOfReviews: product.numOfReviews || 0,
+            images: product.images || [],
+            category: product.category || null,
+            team: product.team || null,
+            stock: product.stock,
+            seller: product.seller || 'Formula Hub',
+            reviews: product.reviews || []
+        };
+
+        response.status(200).json({ 
+            success: true, 
+            message: "Product Retrieved.", 
+            data: formattedProduct 
+        });
+
+    } catch (error) {
+        console.log("Error in fetching Product: ", error.message);
+        response.status(500).json({ 
+            success: false, 
+            message: "Server Error: " + error.message 
+        });
+    }
+};
