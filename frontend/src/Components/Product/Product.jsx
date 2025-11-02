@@ -1,25 +1,59 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-const Product = ({ product }) => {
+import Rating from '@mui/material/Rating';
+import Typography from '@mui/material/Typography';
+
+const Product = ({ product, lastProductRef }) => {
     return (
-        <div className="col-sm-12 col-md-6 col-lg-3 my-3">
-            <div className="card p-3 rounded">
-                <img
-                    className="card-img-top mx-auto"
-                    src={product.images[0].url}
-                />
-                <div className="card-body d-flex flex-column">
-                    <h5 className="card-title">
-                        <a href="">{product.name}</a>
-                    </h5>
-                    <div className="ratings mt-auto">
-                        <div className="rating-outer">
-                            <div className="rating-inner" style={{ width: `${(product.ratings / 5) * 100}%` }}></div>
-                        </div>
-                        <span id="no_of_reviews">({product.numOfReviews} reviews)</span>
+        <div 
+            ref={lastProductRef} 
+            className="product-tile__primary f1-product-card"
+        >
+            <Link to={`/product/${product._id}`}>
+                <div className="tile-img__container">
+                    <img 
+                        src={product.images && product.images[0] ? product.images[0].url : 'https://placehold.co/300x300'} 
+                        alt={product.name}
+                    />
+                    {product.stock === 0 && (
+                        <div className="f1-badge">OUT OF STOCK</div>
+                    )}
+                </div>
+            </Link>
+            <div className="tile-body__container">
+                <div className="product-title f1-product-title">
+                    <Link to={`/product/${product._id}`}>
+                        {product.name}
+                    </Link>
+                </div>
+                <div className="product-category f1-category">
+                    {product.category?.name || 'Uncategorized'}
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                    <Rating
+                        value={product.ratings || 0}
+                        precision={0.5}
+                        readOnly
+                        size="small"
+                        sx={{
+                            '& .MuiRating-iconFilled': {
+                                color: '#dc0000',
+                            },
+                        }}
+                    />
+                    <Typography variant="caption" sx={{ ml: 1, color: '#999' }}>
+                        ({product.numOfReviews || 0})
+                    </Typography>
+                </div>
+                <div className="tile-controls f1-controls">
+                    <div className="product-price f1-product-price">
+                        ₱ {product.price}
                     </div>
-                    <p className="card-text">${product.price}</p>
-                    <Link to={`/product/${product._id}`} id="view_btn" className="btn btn-block">View Details</Link>
+                    <Link to={`/product/${product._id}`}>
+                        <button className="prime-button tile-button f1-cart-button">
+                            View Details
+                        </button>
+                    </Link>
                 </div>
             </div>
         </div>

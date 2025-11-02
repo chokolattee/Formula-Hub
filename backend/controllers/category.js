@@ -184,26 +184,25 @@ exports.deleteCategory = async (request, response) => {
 
         // Delete images from cloudinary
         if (category.images && category.images.length > 0) {
-            for (let i = 0; i < category.images.length; i++) {
-                try {
-                    await cloudinary.v2.uploader.destroy(category.images[i].public_id);
-                } catch (error) {
-                    console.log("Error deleting image from cloudinary:", error);
-                }
-            }
+            const deletePromises = category.images.map(image => 
+                cloudinary.v2.uploader.destroy(image.public_id)
+                    .catch(error => console.log("Error deleting image from cloudinary:", error))
+            );
+            await Promise.all(deletePromises);
         }
 
+        // Delete category from database
         await Category.findByIdAndDelete(id);
 
         response.status(200).json({ 
             success: true, 
             message: "Category Deleted." 
-        })
+        });
     } catch (error) {
         console.error("Error in Delete Category:", error.message);
         response.status(500).json({ 
             success: false, 
             message: "Server Error: Error in Deleting Category." 
-        })
+        });
     }
 }

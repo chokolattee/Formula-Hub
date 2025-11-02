@@ -180,8 +180,8 @@ const ProductList = () => {
   }
   
   const priceValue = parseFloat(formState.price);
-  if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
-    alert('Please enter a valid price between 0 and 5000');
+  if (isNaN(priceValue) || priceValue < 0) {
+    alert('Please enter a valid price.');
     return;
   }
   
@@ -243,9 +243,9 @@ const ProductList = () => {
 };
 
   const handleUpdate = async () => {
-  const priceValue = parseInt(formState.price);
-  if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
-    alert('Please enter a valid price between 0 and 5000');
+  const priceValue = parseFloat(formState.price);
+  if (isNaN(priceValue) || priceValue < 0) {
+    alert('Please enter a valid price.');
     return;
   }
   
@@ -520,9 +520,9 @@ const ProductList = () => {
         value: formState.price,
         onChange: (e) => {
     const value = e.target.value;
-    if (value === '' || /^\d+$/.test(value)) {
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
       const numValue = value === '' ? '' : parseFloat(value);
-      if (value === '' || (numValue >= 0 && numValue <= 5000)) {
+      if (value === '' || (numValue >= 0) || value.endsWith('.')) {
         setFormState({ ...formState, price: value });
       }
     }
@@ -875,7 +875,7 @@ function Row(props) {
           {row.id}
         </TableCell>
         <TableCell align="right">{row.name}</TableCell>
-        <TableCell align="right">${row.price}</TableCell>
+        <TableCell align="right">₱{row.price}</TableCell>
         <TableCell align="right">{row.category}</TableCell>
         <TableCell align="right">{row.team}</TableCell>
         <TableCell align="right">{row.stock}</TableCell>

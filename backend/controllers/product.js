@@ -87,10 +87,10 @@ exports.createProduct = async (request, response) => {
         }
 
         const priceValue = parseFloat(product.price);
-        if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
+        if (isNaN(priceValue) || priceValue < 0) {
             return response.status(400).json({
                 success: false,
-                message: "Price must be a number between 0 and 5000."
+                message: "Price must be a number greater than 0."
             });
         }
 
@@ -201,10 +201,10 @@ exports.updateProduct = async (request, response) => {
         }
 
         const priceValue = parseFloat(product.price);
-        if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
+        if (isNaN(priceValue) || priceValue < 0) {
             return response.status(400).json({
                 success: false,
-                message: "Price must be a number between 0 and 5000."
+                message: "Price must be a number greater than 0."
             });
         }
 

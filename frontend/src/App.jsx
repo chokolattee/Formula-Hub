@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import Home from './Components/Home';
+import Store from "./Components/Store";
 import ProductDetails from './Components/Product/ProductDetails';
 import Login from './Components/User/Login';
 import ForgotPassword from './Components/User/ForgotPassword';
@@ -100,6 +101,7 @@ function App() {
         <Header cartItems={state.cartItems} />
         <Routes>
           <Route path="/" element={<Home />} exact="true" />
+          <Route path="/store" element={<Store />} exact="true" />
           <Route path="/product/:id" element={<ProductDetails cartItems={state.cartItems} addItemToCart={addItemToCart} />} exact="true" />
           <Route path="/search/:keyword" element={<Home />} exact="true" />
           <Route path="/login" element={<Login />} exact="true" />

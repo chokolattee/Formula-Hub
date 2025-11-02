@@ -35,7 +35,7 @@ const Header = ({ cartItems }) => {
             <nav className='client-navigation'>
                 <div className="title-container">
                     <Link to="/">
-                        <img src="./images/logo.png" alt="Formula Hub" />
+                        <img src="/images/logo.png" alt="Formula Hub" />
                     </Link>
                 </div>
 

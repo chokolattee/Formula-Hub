@@ -1,10 +1,10 @@
 ## BASED ON PROJECT REQUIREMENTS
 
-- []   MP 1: Product/Service CRUD bootstrap datatables. upload multiple photos 10pts
+- [x]   MP 1: Product/Service CRUD bootstrap datatables. upload multiple photos 10pts
 
-- []   Product/Service CRUD MUI datatables (gregnb/mui-datatables). upload multiple photos. product/service details are on an expandable/collapsible rows (MAKE THE PRODUCTS COLLAPSIBLE) 15pts 
+- [x]   Product/Service CRUD MUI datatables (gregnb/mui-datatables). upload multiple photos. product/service details are on an expandable/collapsible rows (MAKE THE PRODUCTS COLLAPSIBLE) 15pts 
 
-- []   Product/Service CRUD MUI datatables (gregnb/mui-datatables). upload multiple photos. product/service details are on an expandable/collapsible rows. bulk delete using checkboxes (SELECT ALL missing and the images for the collapsible)
+- [x]   Product/Service CRUD MUI datatables (gregnb/mui-datatables). upload multiple photos. product/service details are on an expandable/collapsible rows. bulk delete using checkboxes (SELECT ALL missing and the images for the collapsible)
 
 # MP2 User Functions 20pts
 
@@ -34,9 +34,9 @@
 
 # UNIT 2
 
-- [] user interface design css 10pts
-- [] user interface design css and bootstrap components 15pts
-- [] user interface design css and Material UI (MUI) components 20pts
+- [x] user interface design css 10pts
+- [x] user interface design css and bootstrap components 15pts
+- [x] user interface design css and Material UI (MUI) components 20pts
 
 # QUIZ 1 Product Filter 15pts
 

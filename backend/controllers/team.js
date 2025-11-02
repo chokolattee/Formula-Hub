@@ -277,18 +277,17 @@ exports.deleteTeam = async (req, res) => {
       });
     }
 
-    // Delete images from Cloudinary
+    // Delete images from Cloudinary in parallel
     if (team.images && team.images.length > 0) {
-      for (const image of team.images) {
-        try {
-          await cloudinary.v2.uploader.destroy(image.public_id);
-          console.log('Deleted image from Cloudinary:', image.public_id);
-        } catch (error) {
-          console.error('Error deleting image from Cloudinary:', error);
-        }
-      }
+      const deletePromises = team.images.map(image =>
+        cloudinary.v2.uploader.destroy(image.public_id)
+          .then(() => console.log('Deleted image from Cloudinary:', image.public_id))
+          .catch(error => console.error('Error deleting image from Cloudinary:', error))
+      );
+      await Promise.all(deletePromises);
     }
 
+    // Delete team from database
     await team.deleteOne();
 
     return res.status(200).json({
