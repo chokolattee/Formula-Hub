@@ -351,7 +351,6 @@ exports.getProductDetails = async (request, response) => {
     try {
         const { id } = request.params;
 
-        // Validate MongoDB ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return response.status(400).json({ 
                 success: false, 
@@ -371,7 +370,6 @@ exports.getProductDetails = async (request, response) => {
             });
         }
 
-        // Format the response to ensure images are properly included
         const formattedProduct = {
             _id: product._id,
             name: product.name,
@@ -398,6 +396,231 @@ exports.getProductDetails = async (request, response) => {
         response.status(500).json({ 
             success: false, 
             message: "Server Error: " + error.message 
+        });
+    }
+};
+
+//filter routes
+exports.getProductByCategory = async (request, response) => {
+    try {
+        const { categoryId } = request.params;
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Validate category ID
+        if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+            return response.status(400).json({
+                success: false,
+                message: "Invalid Category ID format."
+            });
+        }
+
+        const filter = { category: categoryId };
+
+        const totalProducts = await Product.countDocuments(filter);
+        const products = await Product.find(filter)
+            .populate('category')
+            .populate('team')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .exec();
+
+        response.status(200).json({
+            success: true,
+            message: products.length ? `Found ${totalProducts} products in this category.` : "No products found in this category.",
+            data: products,
+            pagination: {
+                total: totalProducts,
+                page,
+                pages: Math.ceil(totalProducts / limit),
+                limit
+            }
+        });
+    } catch (error) {
+        console.log("Error in fetching Products by Category: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error: " + error.message
+        });
+    }
+};
+
+exports.getProductByPrice = async (request, response) => {
+    try {
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        
+        const minPrice = parseFloat(request.query.minPrice) || 0;
+        const maxPrice = parseFloat(request.query.maxPrice) || Number.MAX_VALUE;
+
+        if (minPrice < 0 || maxPrice < 0) {
+            return response.status(400).json({
+                success: false,
+                message: "Price values must be positive numbers."
+            });
+        }
+
+        if (minPrice > maxPrice) {
+            return response.status(400).json({
+                success: false,
+                message: "Minimum price cannot be greater than maximum price."
+            });
+        }
+
+        const filter = {
+            price: {
+                $gte: minPrice,
+                $lte: maxPrice
+            }
+        };
+
+        const totalProducts = await Product.countDocuments(filter);
+        const products = await Product.find(filter)
+            .populate('category')
+            .populate('team')
+            .sort({ price: 1 }) 
+            .skip(skip)
+            .limit(limit)
+            .exec();
+
+        response.status(200).json({
+            success: true,
+            message: products.length ? `Found ${totalProducts} products in price range $${minPrice} - $${maxPrice}.` : "No products found in this price range.",
+            data: products,
+            pagination: {
+                total: totalProducts,
+                page,
+                pages: Math.ceil(totalProducts / limit),
+                limit
+            }
+        });
+    } catch (error) {
+        console.log("Error in fetching Products by Price: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error: " + error.message
+        });
+    }
+};
+
+exports.getProductByRating = async (request, response) => {
+    try {
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        
+        const minRating = parseFloat(request.query.minRating) || 0;
+
+        if (minRating < 0 || minRating > 5) {
+            return response.status(400).json({
+                success: false,
+                message: "Rating must be between 0 and 5."
+            });
+        }
+
+        const filter = {
+            ratings: { $gte: minRating }
+        };
+
+        const totalProducts = await Product.countDocuments(filter);
+        const products = await Product.find(filter)
+            .populate('category')
+            .populate('team')
+            .sort({ ratings: -1 }) 
+            .skip(skip)
+            .limit(limit)
+            .exec();
+
+        response.status(200).json({
+            success: true,
+            message: products.length ? `Found ${totalProducts} products with ${minRating}+ stars.` : "No products found with this rating.",
+            data: products,
+            pagination: {
+                total: totalProducts,
+                page,
+                pages: Math.ceil(totalProducts / limit),
+                limit
+            }
+        });
+    } catch (error) {
+        console.log("Error in fetching Products by Rating: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error: " + error.message
+        });
+    }
+};
+
+exports.getProductByMultipleFilters = async (request, response) => {
+    try {
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        
+        let filter = {};
+
+        // Category filter
+        if (request.query.category && mongoose.Types.ObjectId.isValid(request.query.category)) {
+            filter.category = request.query.category;
+        }
+
+        // Price filter
+        if (request.query.minPrice || request.query.maxPrice) {
+            filter.price = {};
+            if (request.query.minPrice) {
+                const minPrice = parseFloat(request.query.minPrice);
+                if (minPrice >= 0) filter.price.$gte = minPrice;
+            }
+            if (request.query.maxPrice) {
+                const maxPrice = parseFloat(request.query.maxPrice);
+                if (maxPrice >= 0) filter.price.$lte = maxPrice;
+            }
+        }
+
+        // Rating filter
+        if (request.query.minRating) {
+            const minRating = parseFloat(request.query.minRating);
+            if (minRating >= 0 && minRating <= 5) {
+                filter.ratings = { $gte: minRating };
+            }
+        }
+
+        const totalProducts = await Product.countDocuments(filter);
+        const products = await Product.find(filter)
+            .populate('category')
+            .populate('team')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .exec();
+
+        response.status(200).json({
+            success: true,
+            message: products.length ? "Products Retrieved." : "No products match your filters.",
+            data: products,
+            filters: {
+                category: request.query.category || 'All',
+                priceRange: {
+                    min: request.query.minPrice || 0,
+                    max: request.query.maxPrice || 'Any'
+                },
+                minRating: request.query.minRating || 0
+            },
+            pagination: {
+                total: totalProducts,
+                page,
+                pages: Math.ceil(totalProducts / limit),
+                limit
+            }
+        });
+    } catch (error) {
+        console.log("Error in filtering Products: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error: " + error.message
         });
     }
 };

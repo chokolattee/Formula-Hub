@@ -8,7 +8,11 @@ const {
   createProduct,
   updateProduct,
   deleteProduct, 
-  getProductDetails
+  getProductDetails,
+  getProductByCategory,
+  getProductByPrice,
+  getProductByMultipleFilters,
+  getProductByRating
 } = require('../controllers/product');
 
 router.get('/product/all', getAllProduct);
@@ -19,6 +23,11 @@ router.put('/product/:id', upload.array('images', 10), updateProduct);
 router.delete('/product/:id', deleteProduct);
 router.get('/getproduct/:id', getProductDetails);
 
+//filters
+router.get('/category/:categoryId', getProductByCategory);
+router.get('/price', getProductByPrice);
+router.get('/rating', getProductByRating);
+router.get('/search', getProductByMultipleFilters);
 
 module.exports = router;
 

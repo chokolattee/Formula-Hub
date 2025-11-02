@@ -64,12 +64,12 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
 
     const addToCart = async () => {
         if (!loggedUser) {
-    toast.error('Please login to add items to cart');
-    navigate('/login');
-    return;
-}
-await addItemToCart(id, quantity);
-toast.success('Item added to cart');
+            toast.error('Please login to add items to cart');
+            navigate('/login');
+            return;
+        }
+        await addItemToCart(id, quantity);
+        toast.success('Item added to cart');
 
     }
 
@@ -99,8 +99,8 @@ toast.success('Item added to cart');
         )
     }
 
-    const productImages = product.images && product.images.length > 0 
-        ? product.images 
+    const productImages = product.images && product.images.length > 0
+        ? product.images
         : [{ url: '/images/default_product.png', public_id: 'default' }]
 
     return (
@@ -115,12 +115,12 @@ toast.success('Item added to cart');
                                 {/* Thumbnail Gallery - Vertical on Left */}
                                 <div className="thumbnail-gallery">
                                     {productImages.map((image, index) => (
-                                        <div 
+                                        <div
                                             key={image.public_id || index}
                                             className={`thumbnail-item ${selectedImage === index ? 'active' : ''}`}
                                             onClick={() => setSelectedImage(index)}
                                         >
-                                            <img 
+                                            <img
                                                 src={image.url}
                                                 alt={`${product.name} ${index + 1}`}
                                                 className="thumbnail-image"
@@ -131,7 +131,7 @@ toast.success('Item added to cart');
 
                                 {/* Main Image - Right Side of Thumbnails */}
                                 <div className="main-image-wrapper">
-                                    <img 
+                                    <img
                                         src={productImages[selectedImage].url}
                                         alt={product.name}
                                         className="main-product-image"
@@ -179,23 +179,45 @@ toast.success('Item added to cart');
                                     </div>
                                 </div>
 
+                                {/* Quantity Selector */}
+                                <div className="quantity-box">
+                                    <button
+                                        className="qty-btn"
+                                        onClick={decreaseQty}
+                                        disabled={quantity <= 1}
+                                    >
+                                        −
+                                    </button>
+
+                                    <span className="qty-display">{quantity}</span>
+
+                                    <button
+                                        className="qty-btn"
+                                        onClick={increaseQty}
+                                        disabled={quantity >= product.stock}
+                                    >
+                                        +
+                                    </button>
+                                </div>
+
+
                                 {/* Add to Cart Button */}
-                                <button 
+                                <button
                                     className="add-to-cart-btn"
                                     disabled={!loggedUser || product.stock === 0}
                                     onClick={addToCart}
                                 >
-                                    {product.stock === 0 
-                                        ? 'OUT OF STOCK' 
-                                        : !loggedUser 
-                                        ? 'LOGIN TO ADD TO CART' 
-                                        : 'Add to Cart'
+                                    {product.stock === 0
+                                        ? 'OUT OF STOCK'
+                                        : !loggedUser
+                                            ? 'LOGIN TO ADD TO CART'
+                                            : 'Add to Cart'
                                     }
                                 </button>
 
                                 {/* Description Accordion */}
                                 <div className="accordion-section">
-                                    <div 
+                                    <div
                                         className="accordion-header"
                                         onClick={() => setDescriptionOpen(!descriptionOpen)}
                                     >
@@ -213,7 +235,7 @@ toast.success('Item added to cart');
 
                                 {/* Details Accordion */}
                                 <div className="accordion-section">
-                                    <div 
+                                    <div
                                         className="accordion-header"
                                         onClick={() => setDetailsOpen(!detailsOpen)}
                                     >
@@ -243,14 +265,14 @@ toast.success('Item added to cart');
                                                 </span>
                                             </div>
                                         </div>
-                                        
+
                                         {/* Rating */}
-                                        <div className="rating-container" style={{marginTop: '15px'}}>
+                                        <div className="rating-container" style={{ marginTop: '15px' }}>
                                             <div className="rating-outer">
                                                 <div className="rating-stars-empty">
                                                     ★★★★★
                                                 </div>
-                                                <div 
+                                                <div
                                                     className="rating-inner"
                                                     style={{ width: `${(product.ratings / 5) * 100}%` }}
                                                 >
@@ -276,15 +298,15 @@ toast.success('Item added to cart');
                                         Customer Reviews
                                     </h3>
                                     <hr className="divider" />
-                                    
+
                                     <div className="reviews-list">
                                         {product.reviews.map((review, index) => (
                                             <div key={review._id || index} className="review-card">
                                                 <div className="row">
                                                     <div className="col-md-1 col-2">
-                                                        <img 
-                                                            src={review.avatar || '/images/default_avatar.jpg'} 
-                                                            alt="loggedUser" 
+                                                        <img
+                                                            src={review.avatar || '/images/default_avatar.jpg'}
+                                                            alt="loggedUser"
                                                             className="review-avatar"
                                                         />
                                                     </div>
@@ -294,7 +316,7 @@ toast.success('Item added to cart');
                                                                 <div className="rating-stars-empty">
                                                                     ★★★★★
                                                                 </div>
-                                                                <div 
+                                                                <div
                                                                     className="rating-inner"
                                                                     style={{ width: `${(review.rating / 5) * 100}%` }}
                                                                 >

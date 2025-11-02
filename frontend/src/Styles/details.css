@@ -485,6 +485,42 @@
     padding: 2rem 0;
 }
 
+.quantity-box {
+  display: flex;
+  align-items: center;
+  margin: 15px 0;
+  gap: 10px;
+}
+
+.qty-btn {
+  width: 35px;
+  height: 35px;
+  font-size: 20px;
+  border: none;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: 0.2s ease-in-out;
+}
+
+.qty-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.qty-display {
+  font-size: 18px;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+  color: #000;
+  background: #f7f7f7;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
 /* Loading Spinner */
 .loading-container {
     display: flex;
