@@ -129,8 +129,7 @@ const ProductList = () => {
   const loadDataGen = async (id) => {
     try {
       const response = await axios.get(`http://localhost:8000/api/v1/product/${id}`);
-      const productData = response.data.data; // Changed from response.data.product
-
+      const productData = response.data.data; 
       setFormState({
         _id: id,
         name: productData.name,
@@ -175,34 +174,29 @@ const ProductList = () => {
   const handleSubmit = async (event) => {
   event.preventDefault();
   
-  // Validate all required fields
   if (!formState.name || !formState.description || !formState.category || !formState.team || !formState.stock) {
     alert('Please fill in all required fields');
     return;
   }
   
-  // Validate price
   const priceValue = parseFloat(formState.price);
   if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
     alert('Please enter a valid price between 0 and 5000');
     return;
   }
   
-  // Validate stock
   const stockValue = parseInt(formState.stock);
   if (isNaN(stockValue) || stockValue < 0) {
     alert('Please enter a valid stock quantity (must be 0 or greater)');
     return;
   }
   
-  // Validate images
   if (!formState.images || formState.images.length === 0) {
     alert('Please upload at least one product image');
     return;
   }
   
   try {
-    // Convert images to base64
     const base64Images = await Promise.all(
       formState.images.map(file => {
         return new Promise((resolve, reject) => {
@@ -219,7 +213,7 @@ const ProductList = () => {
       price: priceValue,
       description: formState.description.trim(),
       category: formState.category,
-      team: formState.team, // THIS WAS MISSING!
+      team: formState.team, 
       stock: stockValue,
       images: base64Images
     };
@@ -249,7 +243,6 @@ const ProductList = () => {
 };
 
   const handleUpdate = async () => {
-  // Validate price
   const priceValue = parseInt(formState.price);
   if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
     alert('Please enter a valid price between 0 and 5000');
@@ -274,7 +267,7 @@ const ProductList = () => {
 
     const productData = {
       name: formState.name,
-      price: priceValue, // Use validated integer
+      price: priceValue, 
       description: formState.description,
       category: formState.category,
       team: formState.team,
@@ -282,7 +275,7 @@ const ProductList = () => {
       images: imagesToSend
     };
 
-    console.log('Updating product with data:', productData); // Debug log
+    console.log('Updating product with data:', productData); 
 
     const response = await axios.put(
       `http://localhost:8000/api/v1/product/${formState._id}`,
@@ -302,26 +295,48 @@ const ProductList = () => {
     
   } catch (error) {
     console.error('Error updating product:', error);
-    console.error('Error response:', error.response?.data); // Debug log
+    console.error('Error response:', error.response?.data); 
     alert('Failed to update product: ' + (error.response?.data?.message || error.message));
   }
 };
 
   const handleDelete = async (id) => {
-    try {
-      const response = await axios.delete(`http://localhost:8000/api/v1/product/${id}`);
-      if (response.data.success) {
-        alert('Product deleted successfully!');
-        setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+  try {
+    const response = await axios.delete(`http://localhost:8000/api/v1/product/${id}`);
+    if (response.data.success) {
+      setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+      
+      setApiData((prevData) => prevData.filter((product) => product._id !== id));
+      setFlattenData((prevData) => prevData.filter((product) => product.id !== id));
+      
+      setTotal((prevTotal) => prevTotal - 1);
+      
+      setTotalPages((prevPages) => {
+        const newTotal = total - 1;
+        const newPages = Math.ceil(newTotal / limit);
+        
+        if (page > newPages && newPages > 0) {
+          setPage(newPages);
+        }
+        
+        return newPages;
+      });
+      
+      alert('Product deleted successfully!');
+      
+      if (flattenData.length === 1 && page > 1) {
+        setPage(prev => prev - 1);
+      } else {
         fetchProducts();
       }
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      alert('Failed to delete product');
     }
-  };
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to delete product';
+    alert('Failed to delete product: ' + errorMessage);
+  }
+};
 
-  // Auto-open sidebar on desktop
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 992) {
@@ -433,21 +448,55 @@ const ProductList = () => {
   }, [checkedId, flattenData]);
 
   const bulkDelete = async () => {
-    if (checkedId.length === 0) {
-      alert('Please select at least one product to delete');
-      return;
-    }
+  if (checkedId.length === 0) {
+    alert('Please select at least one product to delete');
+    return;
+  }
 
-    if (window.confirm(`Are you sure you want to delete ${checkedId.length} product(s)?`)) {
-      try {
-        await Promise.all(checkedId.map(id => handleDelete(id)));
-        setCheckedId([]);
-        setSelectAll(false);
-      } catch (e) {
-        console.log(e);
+  if (window.confirm(`Are you sure you want to delete ${checkedId.length} product(s)?`)) {
+    try {
+      const deleteCount = checkedId.length;
+      
+      // Delete all selected products
+      const deletePromises = checkedId.map(id => 
+        axios.delete(`http://localhost:8000/api/v1/product/${id}`)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      // Update local state immediately
+      setApiData((prevData) => 
+        prevData.filter((product) => !checkedId.includes(product._id))
+      );
+      setFlattenData((prevData) => 
+        prevData.filter((product) => !checkedId.includes(product.id))
+      );
+      
+      // Clear selections
+      setCheckedId([]);
+      setSelectAll(false);
+      
+      setTotal((prevTotal) => prevTotal - deleteCount);
+      
+      const newTotal = total - deleteCount;
+      const newPages = Math.ceil(newTotal / limit);
+      setTotalPages(newPages);
+      
+      if (page > newPages && newPages > 0) {
+        setPage(newPages);
       }
+      
+      alert(`Successfully deleted ${deleteCount} product(s)!`);
+      
+      fetchProducts();
+      
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      alert('Some products failed to delete. Please try again.');
+      fetchProducts();
     }
   }
+};
 
   const modalData = {
     title: 'Product',
