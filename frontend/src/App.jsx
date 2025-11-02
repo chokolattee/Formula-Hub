@@ -27,8 +27,6 @@ import ProductsList from './Components/Admin/ProductsList';
 import TeamsList from './Components/Admin/TeamsList';
 import UsersList from './Components/Admin/UsersList';
 import CategoriesList from './Components/Admin/CategoriesList';
-import NewProduct from './Components/Admin/NewProduct';
-import UpdateProduct from './Components/Admin/UpdateProduct';
 import OrdersList from './Components/Admin/OrdersList';
 import ProcessOrder from './Components/Admin/ProcessOrder';
 import axios from 'axios';
@@ -119,8 +117,6 @@ function App() {
           {/* Admin Routes */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin/products" element={<ProductsList />} />
-          <Route path="/admin/product" element={<NewProduct />} />
-          <Route path="/admin/product/:id" element={<UpdateProduct />} />
           <Route path="/admin/orders" element={<OrdersList />} />
           <Route path="/admin/order/:id" element={<ProcessOrder />} />
           <Route path="/admin/teams" element={<TeamsList />} />

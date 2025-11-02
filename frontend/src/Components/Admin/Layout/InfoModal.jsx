@@ -7,7 +7,13 @@ import { Paper, Button, colors } from '@mui/material'
 import { FaArrowAltCircleRight } from "react-icons/fa";
 import { FaArrowAltCircleLeft } from "react-icons/fa";
 
-const InfoModal = React.forwardRef(({ setOpenModal, modalData: { title, content, fields }, formState }, ref) => {
+const InfoModal = React.forwardRef(({ 
+    setOpenModal, 
+    modalData: { title, content, fields }, 
+    formState,
+    categories = [],
+    teams = []
+}, ref) => {
     const imagesToDisplay = formState.existingImages && formState.existingImages.length > 0 
         ? formState.existingImages 
         : (Array.isArray(formState.images) ? formState.images : []);
@@ -15,6 +21,20 @@ const InfoModal = React.forwardRef(({ setOpenModal, modalData: { title, content,
     const closeModals = () => {
         setOpenModal(false)
     }
+
+    // Helper function to get display value
+    const getDisplayValue = (field) => {
+        if (field.type === 'select') {
+            if (field.name === 'category') {
+                const category = categories.find(cat => cat._id === field.value);
+                return category ? category.name : 'N/A';
+            } else if (field.name === 'team') {
+                const team = teams.find(t => t._id === field.value);
+                return team ? team.name : 'N/A';
+            }
+        }
+        return field.value || 'N/A';
+    };
 
     return (
         <div 
@@ -102,7 +122,7 @@ const InfoModal = React.forwardRef(({ setOpenModal, modalData: { title, content,
                                 padding: '8px 0',
                                 borderBottom: '1px solid #eee'
                             }}>
-                                <strong>{field.label}:</strong> {field.value}
+                                <strong>{field.label}:</strong> {getDisplayValue(field)}
                             </div>
                         )
                     ))}

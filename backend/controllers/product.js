@@ -1,193 +1,240 @@
-const Product = require('../models/product')
-const Order = require('../models/order');
-const APIFeatures = require('../utils/apiFeatures');
+const mongoose = require('mongoose');
+const cloudinary = require('cloudinary');
+const express = require('express');
+const Product = require('../models/product.js');
+const User = require('../models/user.js');
+const Category = require('../models/category.js');
+const Team = require('../models/team.js');
 
-const cloudinary = require('cloudinary')
+exports.getAllProduct = async (request, response) => {
+    try {
+        const product = await Product.find({})
+            .sort({ createdAt: -1 })
+            .exec();
 
-exports.newProduct = async (req, res, next) => {
-    console.log(req.files)
-    let images = []
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-    if (typeof req.body.images === 'string') {
-		images.push(req.body.images)
-	} else {
-		images = req.body.images
-	}
+        response.status(200).json({
+            success: true,
+            message: "Product Retrieved.",
+            data: product
+        });
+    } catch (error) {
+        console.log("Error in fetching Products: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error."
+        });
+    }
+};
 
-    let imagesLinks = [];
+exports.getProduct = async (request, response) => {
+    try {
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
-    for (let i = 0; i < images.length; i++) {
-        try {
-            const result = await cloudinary.v2.uploader.upload(images[i], {
-                folder: 'products',
-                width: 150,
-                crop: "scale",
+        const totalProducts = await Product.countDocuments();
+        const products = await Product.find({})
+            .populate('category')
+            .populate('team')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .exec();
+
+        response.status(200).json({
+            success: true,
+            message: products.length ? "Products Retrieved." : "No products found.",
+            data: products,
+            pagination: {
+                total: totalProducts,
+                page,
+                pages: Math.ceil(totalProducts / limit),
+                limit
+            }
+        });
+    } catch (error) {
+        console.log("Error in fetching Products: ", error.message);
+        response.status(500).json({
+            success: false,
+            message: "Server Error."
+        });
+    }
+};
+
+exports.getOneProduct = async (request, response) => {
+    try {
+        const { id } = request.params;
+        const product = await Product.findById(id)
+            .populate('category')
+            .populate('team')
+            .exec();
+        response.status(200).json({ success: true, message: "Product Retrieved.", data: product });
+    } catch (error) {
+        console.log("Error in fetching Product: ", error.message);
+        response.status(500).json({ success: false, message: "Server Error." });
+    }
+};
+
+exports.createProduct = async (request, response) => {
+    try {
+        const product = request.body;
+
+        // Validate required fields BEFORE image processing
+        if (!product.name || !product.description || !product.category || !product.price || !product.team || !product.stock) {
+            return response.status(400).json({ 
+                success: false, 
+                message: "Please provide all required fields (name, description, category, price, team, stock)." 
             });
-
-            imagesLinks.push({
-                public_id: result.public_id,
-                url: result.secure_url
-            })
-
-        } catch (error) {
-            console.log(error)
         }
 
-    }
+        // Validate price range
+        const priceValue = parseFloat(product.price);
+        if (isNaN(priceValue) || priceValue < 0 || priceValue > 5000) {
+            return response.status(400).json({
+                success: false,
+                message: "Price must be a number between 0 and 5000."
+            });
+        }
 
-    req.body.images = imagesLinks
-    // req.body.user = req.user.id;
+        // Validate stock
+        const stockValue = parseInt(product.stock);
+        if (isNaN(stockValue) || stockValue < 0) {
+            return response.status(400).json({
+                success: false,
+                message: "Stock must be a positive number."
+            });
+        }
 
-    const product = await Product.create(req.body);
+        // Process images
+        let images = [];
+        if (typeof request.body.images === 'string') {
+            images.push(request.body.images);
+        } else if (Array.isArray(request.body.images)) {
+            images = request.body.images;
+        }
 
-    if (!product)
-        return res.status(400).json({
-            success: false,
-            message: 'Product not created'
-        })
+        if (images.length === 0) {
+            return response.status(400).json({
+                success: false,
+                message: "Please provide at least one product image."
+            });
+        }
 
+        let imagesLinks = [];
+        for (let i = 0; i < images.length; i++) {
+            try {
+                const result = await cloudinary.v2.uploader.upload(images[i], {
+                    folder: 'products',
+                    width: 500,
+                    height: 500,
+                    crop: "scale",
+                });
 
-    return res.status(201).json({
-        success: true,
-        product
-    })
-}
+                imagesLinks.push({
+                    public_id: result.public_id,
+                    url: result.secure_url
+                });
 
-exports.getSingleProduct = async (req, res, next) => {
-    const product = await Product.findById(req.params.id);
-    if (!product) {
-        return res.status(404).json({
-            success: false,
-            message: 'Product not found'
-        })
-    }
-    return res.status(200).json({
-        success: true,
-        product
-    })
-}
+            } catch (error) {
+                console.log("Image upload error:", error);
+                return response.status(500).json({
+                    success: false,
+                    message: "Failed to upload images to Cloudinary."
+                });
+            }
+        }
 
-exports.getAdminProducts = async (req, res, next) => {
-
-    const products = await Product.find({});
-    if (!products) {
-        return res.status(404).json({
-            success: false,
-            message: 'Products not found'
-        })
-    }
-    return res.status(200).json({
-        success: true,
-        products
-    })
-
-}
-
-exports.updateProduct = async (req, res, next) => {
-    let product = await Product.findById(req.params.id);
-    // console.log(req.body)
-    if (!product) {
-        return res.status(404).json({
-            success: false,
-            message: 'Product not found'
-        })
-    }
-    let images = []
-
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-    console.log(images)
-    if (typeof req.body.images === 'string') {
-		images.push(req.body.images)
-	} else {
-		images = req.body.images
-	}
-    // if (images !== undefined) {
-    // 	// Deleting images associated with the product
-    // 	for (let i = 0; i < product.images.length; i++) {
-    // 		const result = await cloudinary.v2.uploader.destroy(product.images[i].public_id)
-    // 	}
-    // }
-    let imagesLinks = [];
-    for (let i = 0; i < images.length; i++) {
-        const result = await cloudinary.v2.uploader.upload(images[i], {
-            folder: 'products',
-            width: 150,
-            crop: "scale",
+        // Create product with validated data
+        const newProduct = new Product({
+            name: product.name.trim(),
+            price: priceValue,
+            description: product.description.trim(),
+            category: product.category,
+            team: product.team,
+            stock: stockValue,
+            images: imagesLinks
         });
-        imagesLinks.push({
-            public_id: result.public_id,
-            url: result.secure_url
-        })
 
+        await newProduct.save();
+        
+        const populatedProduct = await Product.findById(newProduct._id)
+            .populate('category')
+            .populate('team');
+            
+        response.status(201).json({ 
+            success: true, 
+            data: populatedProduct, 
+            message: "Product created successfully!" 
+        });
+        
+    } catch (error) {
+        console.error("Error in Create Product:", error.message);
+        response.status(500).json({ 
+            success: false, 
+            message: "Server Error: " + error.message 
+        });
     }
-    req.body.images = imagesLinks
-    product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-        useFindandModify: false
-    })
-    // console.log(product)
-    return res.status(200).json({
-        success: true,
-        product
-    })
 }
 
-exports.deleteProduct = async (req, res, next) => {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    if (!product) {
-        return res.status(404).json({
-            success: false,
-            message: 'Product not found'
-        })
+exports.updateProduct = async (request, response) => {
+    const { id } = request.params;
+
+    let images = []
+    if (Array.isArray(request.body.images)) {
+        if (typeof request.body.images[0] === 'string') {
+            images = request.body.images;
+            let imagesLinks = [];
+            for (let i = 0; i < images.length; i++) {
+                try {
+                    const result = await cloudinary.v2.uploader.upload(images[i], {
+                        folder: 'products',
+                        width: 500,
+                        height: 500,
+                        crop: "scale",
+                    });
+
+                    imagesLinks.push({
+                        public_id: result.public_id,
+                        url: result.secure_url
+                    })
+
+                } catch (error) {
+                    console.log("Cant Upload", error)
+                }
+            }
+            request.body.images = imagesLinks
+        }
+    } else if (typeof request.body.images === 'string') {
+        images.push(request.body.images);
     }
 
-    return res.status(200).json({
-        success: true,
-        message: 'Product deleted'
-    })
+    const product = request.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return response.status(404).json({ success: false, message: "Invalid Product ID" });
+    }
+
+    try {
+        const updatedProduct = await Product.findByIdAndUpdate(id, product, { new: true })
+            .populate('category')
+            .populate('team');
+        response.status(200).json({ success: true, data: updatedProduct });
+    } catch (error) {
+        response.status(500).json({ success: false, message: "Server Error: Error in Updating Product." })
+    }
 }
 
-exports.getProducts = async (req, res) => {
+exports.deleteProduct = async (request, response) => {
+    const { id } = request.params;
+    try {
+        const result = await Product.findByIdAndDelete(id);
 
-    const resPerPage = 4;
-    const productsCount = await Product.countDocuments();
+        if (!result) {
+            return response.status(404).send({ message: 'Product not Found.' });
+        }
 
-    // const products = await Product.find({})
-    const apiFeatures = new APIFeatures(Product.find(), req.query).search().filter()
-
-    apiFeatures.pagination(resPerPage);
-	const products = await apiFeatures.query;
-    let filteredProductsCount = products.length;
-
-    if (!products)
-        return res.status(400).json({ message: 'error loading products' })
-    return res.status(200).json({
-        success: true,
-        products,
-        filteredProductsCount,
-        resPerPage,
-        productsCount,
-
-    })
-
-
-    // if (!products)
-    //     return res.status(400).json({ message: 'error loading products' })
-
-    // return res.status(200).json({
-    //     success: true,
-    //     products,
-    //     resPerPage,
-    //     productsCount,
-
-    // })
+        response.status(200).json({ success: true, message: "Product Deleted." })
+    } catch (error) {
+        response.status(500).json({ success: false, message: "Server Error: Error in Deleting Product." })
+    }
 }

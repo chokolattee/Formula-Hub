@@ -24,19 +24,19 @@
     justify-content: center;
     align-items: center;
     padding: 50px;
+    overflow-y: auto;
 }
 
 .modal-container {
     display: block;
     background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
-    padding: 50px;
+    padding: 35px;
     border-radius: 12px;
     font-weight: 300;
     width: 1000px;
-    height: 500px;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
-    padding: 35px;
     animation: drop 0.6s forwards; 
     box-shadow: 
         0 10px 50px rgba(220, 0, 0, 0.5),
@@ -44,7 +44,8 @@
         inset 0 0 0 2px var(--f1-red);
     border: 3px solid var(--f1-red);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
+    margin: auto;
 }
 
 .modal-container::before {
@@ -55,17 +56,6 @@
     right: 0;
     height: 4px;
     background: linear-gradient(to right, transparent, var(--f1-red), var(--f1-accent), var(--f1-red), transparent);
-}
-
-.crud-form {
-    width: 50%;
-}
-
-.modal-container .main-area {
-    width: 100%;
-    display: flex;
-    min-height: 350px;
-    gap: 50px;
 }
 
 .modal-container h2 {
@@ -85,6 +75,22 @@
     line-height: 22px;
     color: var(--f1-light-gray);
     margin-bottom: 20px;
+}
+
+.modal-container .main-area {
+    width: 100%;
+    display: flex;
+    gap: 30px;
+    overflow-y: auto;
+    max-height: calc(90vh - 150px);
+    padding-right: 10px;
+}
+
+.crud-form {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
 }
 
 .content {
@@ -195,48 +201,110 @@
     color: var(--f1-white) !important;
 }
 
+/* MUI Select Styling for F1 Theme */
+.MuiSelect-select {
+    color: var(--f1-white) !important;
+}
+
+.MuiSelect-icon {
+    color: var(--f1-red) !important;
+}
+
+.MuiMenu-paper {
+    background: var(--f1-dark-gray) !important;
+    border: 2px solid var(--f1-border) !important;
+}
+
+.MuiMenuItem-root {
+    color: var(--f1-white) !important;
+    transition: all 0.3s ease !important;
+}
+
+.MuiMenuItem-root:hover {
+    background: rgba(220, 0, 0, 0.2) !important;
+}
+
+.MuiMenuItem-root.Mui-selected {
+    background: rgba(220, 0, 0, 0.3) !important;
+}
+
+.MuiMenuItem-root.Mui-selected:hover {
+    background: rgba(220, 0, 0, 0.4) !important;
+}
+
 .form-control {
     display: flex;
     gap: 15px;
-    justify-content: flex-end;
-    margin-top: 20px;
+    justify-content: center;
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--f1-border);
 }
 
 .prime-button,
 .secondary-button {
-    padding: 12px 30px;
-    border-radius: 6px;
+    padding: 14px 40px;
+    border-radius: 4px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: none;
-    font-size: 14px;
+    font-size: 13px;
+    min-width: 140px;
+    position: relative;
+    overflow: hidden;
 }
 
 .prime-button {
-    background: linear-gradient(135deg, var(--f1-red) 0%, var(--f1-dark-red) 100%);
+    background: var(--f1-red);
     color: var(--f1-white);
+    border: 2px solid var(--f1-red);
     box-shadow: 0 4px 15px rgba(220, 0, 0, 0.4);
 }
 
+.prime-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.prime-button:hover::before {
+    left: 100%;
+}
+
 .prime-button:hover {
-    background: linear-gradient(135deg, var(--f1-accent) 0%, var(--f1-red) 100%);
+    background: var(--f1-accent);
+    border-color: var(--f1-accent);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(220, 0, 0, 0.6);
 }
 
+.prime-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(220, 0, 0, 0.4);
+}
+
 .secondary-button {
     background: transparent;
-    color: var(--f1-light-gray);
-    border: 2px solid var(--f1-border);
+    color: var(--f1-white);
+    border: 2px solid var(--f1-light-gray);
 }
 
 .secondary-button:hover {
-    background: var(--f1-border);
+    background: rgba(255, 255, 255, 0.1);
     color: var(--f1-white);
     border-color: var(--f1-white);
+    transform: translateY(-2px);
+}
+
+.secondary-button:active {
+    transform: translateY(0);
 }
 
 .content .buttons .button {
@@ -273,16 +341,13 @@
 
 @keyframes drop {
     0% {
-        height: 550px;
         transform: translateY(-500px) scale(0.8);
         opacity: 0;
     }
     50% {
-        min-height: 300px;
         transform: translateY(10px) scale(1.02);
     } 
     100% {
-        height: 550px;
         transform: translateY(0) scale(1);
         opacity: 1;
     }
@@ -290,23 +355,21 @@
 
 @keyframes drop2 {
     0% {
-        height: 600px;
         transform: translateY(-500px) scale(0.8);
         opacity: 0;
     }
     50% {
-        min-height: 300px;
         transform: translateY(10px) scale(1.02);
     } 
     100% {
-        height: 600px;
         transform: translateY(0) scale(1);
         opacity: 1;
     }
 }
 
 .modal-container-portrait {
-    height: 600px;
+    height: auto;
+    max-height: 90vh;
     width: 520px;
     background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
     animation: drop2 .6s ease;
@@ -317,7 +380,8 @@
         0 0 100px rgba(220, 0, 0, 0.3);
     border: 3px solid var(--f1-red);
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    margin: auto;
 }
 
 .modal-container-portrait::before {
@@ -351,9 +415,12 @@
 
 .carousel-container {
     width: 50%;
-    max-height: 350px;
+    max-height: 500px;
     border-radius: 10px;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .carousel-img__container {
@@ -363,6 +430,7 @@
     justify-content: center;
     align-items: center;
     background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    padding: 20px;
 }
 
 .carousel-img__container .img-container {
@@ -451,7 +519,8 @@
 }
 
 .modal-container__inventory {
-    height: 600px;
+    height: auto;
+    max-height: 90vh;
     width: 1200px;
     background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
     box-shadow: 
@@ -461,7 +530,8 @@
     border-radius: 12px;
     padding: 35px;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    margin: auto;
 }
 
 .modal-container__inventory::before {
@@ -551,11 +621,38 @@
     background: linear-gradient(135deg, var(--f1-red) 0%, var(--f1-dark-red) 100%) !important;
 }
 
+/* Scrollbar Styling */
+.main-area::-webkit-scrollbar,
+.modal-container-portrait::-webkit-scrollbar,
+.modal-container__inventory::-webkit-scrollbar {
+    width: 8px;
+}
+
+.main-area::-webkit-scrollbar-track,
+.modal-container-portrait::-webkit-scrollbar-track,
+.modal-container__inventory::-webkit-scrollbar-track {
+    background: var(--f1-dark-gray);
+    border-radius: 10px;
+}
+
+.main-area::-webkit-scrollbar-thumb,
+.modal-container-portrait::-webkit-scrollbar-thumb,
+.modal-container__inventory::-webkit-scrollbar-thumb {
+    background: var(--f1-red);
+    border-radius: 10px;
+}
+
+.main-area::-webkit-scrollbar-thumb:hover,
+.modal-container-portrait::-webkit-scrollbar-thumb:hover,
+.modal-container__inventory::-webkit-scrollbar-thumb:hover {
+    background: var(--f1-accent);
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
     .modal-container {
         width: 90%;
-        height: auto;
+        max-width: 90vw;
     }
 
     .modal-container .main-area {
@@ -564,6 +661,29 @@
 
     .crud-form,
     .carousel-container {
+        width: 100%;
+    }
+
+    .modal-background {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .modal-container {
+        padding: 20px;
+    }
+
+    .modal-container h2 {
+        font-size: 22px;
+    }
+
+    .form-control {
+        flex-direction: column;
+    }
+
+    .prime-button,
+    .secondary-button {
         width: 100%;
     }
 }

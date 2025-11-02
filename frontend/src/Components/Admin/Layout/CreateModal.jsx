@@ -1,6 +1,10 @@
 import React, { forwardRef } from 'react';
 import '../../../Styles/Modal.css';
 import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import { Carousel } from 'react-responsive-carousel';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { Paper, Button } from '@mui/material';
@@ -79,11 +83,35 @@ const CreateModal = forwardRef(({
                                     </div>
                                 </div>
                             ) : field.type === 'custom' ? (
-                                // Handle custom components (like the team selector)
+                                // Handle custom components
                                 <div key={field.name} className="input-group">
                                     {field.customComponent}
                                 </div>
-                            ) : field.type === 'text' || field.type === 'textarea' ? (
+                            ) : field.type === 'select' ? (
+                                // Handle select dropdowns for Category and Team
+                                <div key={field.name} className="input-group">
+                                    <FormControl fullWidth variant="outlined" required={field.required}>
+                                        <InputLabel id={`${field.name}-label`}>{field.label}</InputLabel>
+                                        <Select
+                                            labelId={`${field.name}-label`}
+                                            id={`select-${field.name}`}
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            label={field.label}
+                                            name={field.name}
+                                        >
+                                            <MenuItem value="">
+                                                <em>Select {field.label}</em>
+                                            </MenuItem>
+                                            {field.options && field.options.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </div>
+                            ) : field.type === 'text' || field.type === 'number' || field.type === 'textarea' ? (
                                 <div key={field.name} className="input-group">
                                     <TextField
                                         id={`outlined-${field.name}`}

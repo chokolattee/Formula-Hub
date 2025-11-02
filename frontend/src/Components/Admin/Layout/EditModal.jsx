@@ -74,8 +74,7 @@ const EditModal = React.forwardRef(({
                                 </div>
                             ) :
                             field.type === 'text' || field.type === 'textarea' || 
-                            field.type === 'password' || field.type === 'email' || 
-                            field.type === 'number' ? (
+                            field.type === 'password' || field.type === 'email' ? (
                                 <div key={field.name} className="input-group">
                                     <TextField
                                         id="outlined-basic"
@@ -89,6 +88,27 @@ const EditModal = React.forwardRef(({
                                         required={field.required}
                                         className={field.className}
                                         fullWidth
+                                    />
+                                </div>
+                            ) : field.type === 'number' ? (
+                                <div key={field.name} className="input-group">
+                                    <TextField
+                                        id="outlined-basic"
+                                        label={field.label}
+                                        variant="outlined"
+                                        type={field.type}
+                                        name={field.name}
+                                        placeholder={field.placeholder}
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        required={field.required}
+                                        className={field.className}
+                                        fullWidth
+                                        inputProps={{
+                                            min: field.min !== undefined ? field.min : undefined,
+                                            max: field.max !== undefined ? field.max : undefined,
+                                            step: field.step || "1"
+                                        }}
                                     />
                                 </div>
                             ) : field.type === 'file' ? (
@@ -120,16 +140,12 @@ const EditModal = React.forwardRef(({
                                         required={field.required}
                                         className={field.className}
                                     >
-                                        <option value="null">Choose an option</option>
-                                        {field.options === undefined ? (
-                                            <option></option>
-                                        ) : (
-                                            field.options.map((option, index) => (
-                                                <option key={index} value={option._id}>
-                                                    {option[field.requestFor]}
-                                                </option>
-                                            ))
-                                        )}
+                                        <option value="">Choose an option</option>
+                                        {field.options && field.options.map((option, idx) => (
+                                            <option key={idx} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                             ) : (
