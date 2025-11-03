@@ -1,102 +1,208 @@
-import React, { Fragment } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
-import { useParams, useNavigate } from 'react-router-dom'
+import '../../Styles/cart.css'
 
 
-const Cart = ({addItemToCart, removeItemFromCart, cartItems}) => {
+const Cart = ({addItemToCart, removeItemFromCart, cartItems: propsCartItems}) => {
   
     const navigate = useNavigate()
     
+    // Use props cart items or fallback to localStorage
+    const [cartItems, setCartItems] = useState(() => {
+        if (propsCartItems && propsCartItems.length > 0) {
+            return propsCartItems.filter(item => item != null && item.product);
+        }
+        const localCart = localStorage.getItem('cartItems');
+        if (localCart) {
+            try {
+                const parsed = JSON.parse(localCart);
+                return Array.isArray(parsed) ? parsed.filter(item => item != null && item.product) : [];
+            } catch (e) {
+                console.error('Error parsing cart from localStorage:', e);
+                return [];
+            }
+        }
+        return [];
+    });
+
+    // Update cartItems when props change
+    useEffect(() => {
+        if (propsCartItems) {
+            // Filter out any null/undefined items
+            const validItems = propsCartItems.filter(item => item != null && item.product);
+            setCartItems(validItems);
+            localStorage.setItem('cartItems', JSON.stringify(validItems));
+        }
+    }, [propsCartItems]);
+
+    // Save to localStorage whenever cartItems changes
+    useEffect(() => {
+        if (cartItems && cartItems.length >= 0) {
+            const validItems = cartItems.filter(item => item != null && item.product);
+            localStorage.setItem('cartItems', JSON.stringify(validItems));
+        }
+    }, [cartItems]);
 
     const increaseQty = (id, quantity, stock) => {
         const newQty = quantity + 1;
         if (newQty > stock) return;
-       addItemToCart(id, newQty)
+        
+        if (addItemToCart) {
+            addItemToCart(id, newQty);
+        } else {
+            // Local update
+            const updatedCart = cartItems.map(item => 
+                item && item.product === id ? { ...item, quantity: newQty } : item
+            ).filter(item => item != null);
+            setCartItems(updatedCart);
+        }
     }
 
     const decreaseQty = (id, quantity) => {
         const newQty = quantity - 1;
         if (newQty <= 0) return;
-        addItemToCart(id, newQty)
+        
+        if (addItemToCart) {
+            addItemToCart(id, newQty);
+        } else {
+            // Local update
+            const updatedCart = cartItems.map(item => 
+                item && item.product === id ? { ...item, quantity: newQty } : item
+            ).filter(item => item != null);
+            setCartItems(updatedCart);
+        }
     }
 
     const removeCartItemHandler = (id) => {
-       removeItemFromCart(id)
+        if (removeItemFromCart) {
+            removeItemFromCart(id);
+        } else {
+            // Local removal
+            const updatedCart = cartItems.filter(item => item && item.product !== id);
+            setCartItems(updatedCart);
+        }
     }
+    
     const checkoutHandler = () => {
         navigate('/login?redirect=shipping')
     }
-    localStorage.setItem('cartItems', JSON.stringify(cartItems))
 
     return (
         <>
             <MetaData title={'Your Cart'} />
-            {cartItems.length === 0 ? <h2 className="mt-5">Your Cart is Empty</h2> : (
-                <>
-                    <h2 className="mt-5">Your Cart: <b>{cartItems.length} items</b></h2>
-
-                    <div className="row d-flex justify-content-between">
-                        <div className="col-12 col-lg-8">
-
-                            {cartItems.map(item => (
-                                <>
-                                    <hr />
-
-                                    <div className="cart-item" key={item.product}>
-                                        <div className="row">
-                                            <div className="col-4 col-lg-3">
-                                                <img src={item.image} alt="Laptop" height="90" width="115" />
-                                            </div>
-
-                                            <div className="col-5 col-lg-3">
-                                                <Link to={`/products/${item.product}`}>{item.name}</Link>
-                                            </div>
-
-
-                                            <div className="col-4 col-lg-2 mt-4 mt-lg-0">
-                                                <p id="card_item_price">${item.price}</p>
-                                            </div>
-
-                                            <div className="col-4 col-lg-3 mt-4 mt-lg-0">
-                                                <div className="stockCounter d-inline">
-                                                    <span className="btn btn-danger minus" onClick={() => decreaseQty(item.product, item.quantity)}>-</span>
-
-                                                    <input type="number" className="form-control count d-inline" value={item.quantity} readOnly />
-
-                                                    <span className="btn btn-primary plus" onClick={() => increaseQty(item.product, item.quantity, item.stock)}>+</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-4 col-lg-1 mt-4 mt-lg-0">
-                                                <i id="delete_cart_item" className="fa fa-trash btn btn-danger" onClick={() => removeCartItemHandler(item.product)} ></i>
-                                                {/* <i id="delete_cart_item" className="fa fa-trash btn btn-danger" ></i> */}
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                    <hr />
-                                </>
-                            ))}
-
+            <div className="cart-container">
+                {!cartItems || cartItems.length === 0 ? (
+                    <div className="empty-cart">
+                        <div className="empty-cart-icon">🛒</div>
+                        <h2 className="empty-cart-title">Your Cart is Empty</h2>
+                        <p className="empty-cart-text">Add some F1 collectibles to get started!</p>
+                        <Link to="/store" className="continue-shopping-btn">
+                            Continue Shopping
+                        </Link>
+                    </div>
+                ) : (
+                    <>
+                        <div className="cart-header">
+                            <h1 className="cart-title">Shopping Cart</h1>
+                            <p className="cart-count">{cartItems.length} {cartItems.length === 1 ? 'Item' : 'Items'}</p>
                         </div>
 
-                        <div className="col-12 col-lg-3 my-4">
-                            <div id="order_summary">
-                                <h4>Order Summary</h4>
-                                <hr />
-                                <p>Subtotal:  <span className="order-summary-values">{cartItems.reduce((acc, item) => (acc + Number(item.quantity)), 0)} (Units)</span></p>
-                                <p>Est. total: <span className="order-summary-values">${cartItems.reduce((acc, item) => acc + item.quantity * item.price, 0).toFixed(2)}</span></p>
+                        <div className="cart-content">
+                            <div className="cart-items-section">
+                                {cartItems.filter(item => item != null && item.product).map((item, index) => (
+                                    <div className="cart-item-card" key={item.product || `cart-item-${index}`}>
+                                        <div className="cart-item-image">
+                                            <img src={item.image || '/images/default_product.png'} alt={item.name || 'Product'} />
+                                        </div>
 
+                                        <div className="cart-item-details">
+                                            <Link to={`/products/${item.product}`} className="cart-item-name">
+                                                {item.name || 'Unknown Product'}
+                                            </Link>
+                                            <p className="cart-item-price">₱{(item.price || 0).toFixed(2)}</p>
+                                        </div>
 
-                                <hr />
-                                <button id="checkout_btn" className="btn btn-primary btn-block" onClick={checkoutHandler}>Check out</button>
-                                {/*<button id="checkout_btn" className="btn btn-primary btn-block" >Check out</button>*/}
+                                        <div className="cart-item-quantity">
+                                            <div className="quantity-controls">
+                                                <button 
+                                                    className="qty-control-btn minus" 
+                                                    onClick={() => decreaseQty(item.product, item.quantity)}
+                                                    disabled={(item.quantity || 1) <= 1}
+                                                >
+                                                    −
+                                                </button>
+                                                <span className="qty-value">{item.quantity || 1}</span>
+                                                <button 
+                                                    className="qty-control-btn plus" 
+                                                    onClick={() => increaseQty(item.product, item.quantity, item.stock)}
+                                                    disabled={(item.quantity || 1) >= (item.stock || 0)}
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                            <p className="stock-info">{item.stock || 0} in stock</p>
+                                        </div>
+
+                                        <div className="cart-item-total">
+                                            <p className="item-total-label">Total</p>
+                                            <p className="item-total-price">₱{((item.quantity || 1) * (item.price || 0)).toFixed(2)}</p>
+                                        </div>
+
+                                        <button 
+                                            className="remove-item-btn" 
+                                            onClick={() => removeCartItemHandler(item.product)}
+                                            title="Remove item"
+                                        >
+                                            <i className="fa fa-trash"></i>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="cart-summary-section">
+                                <div className="cart-summary-card">
+                                    <h2 className="summary-title">Order Summary</h2>
+                                    
+                                    <div className="summary-divider"></div>
+                                    
+                                    <div className="summary-row">
+                                        <span className="summary-label">Subtotal</span>
+                                        <span className="summary-value">
+                                            {cartItems.reduce((acc, item) => (acc + Number(item?.quantity || 0)), 0)} Units
+                                        </span>
+                                    </div>
+
+                                    <div className="summary-row">
+                                        <span className="summary-label">Shipping</span>
+                                        <span className="summary-value">Calculated at checkout</span>
+                                    </div>
+
+                                    <div className="summary-divider"></div>
+
+                                    <div className="summary-row total">
+                                        <span className="summary-label">Est. Total</span>
+                                        <span className="summary-value total-price">
+                                            ₱{cartItems.reduce((acc, item) => acc + (item?.quantity || 0) * (item?.price || 0), 0).toFixed(2)}
+                                        </span>
+                                    </div>
+
+                                    <button 
+                                        className="checkout-btn" 
+                                        onClick={checkoutHandler}
+                                    >
+                                        Proceed to Checkout
+                                    </button>
+
+                                    <Link to="/store" className="continue-shopping-link">
+                                        ← Continue Shopping
+                                    </Link>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </>
-            )}
+                    </>
+                )}
+            </div>
         </>
     )
 }

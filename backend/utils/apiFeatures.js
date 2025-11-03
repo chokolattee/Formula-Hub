@@ -5,7 +5,7 @@ class APIFeatures {
         this.queryStr = queryStr;
     }
     // http://localhost:2173?keyword=apple&price[]
-    // http://localhost:4001/api/v1/products?page=1&keyword=apple&price[lte]=1000&price[gte]=10
+    // http://localhost:8000/api/v1/products?page=1&keyword=apple&price[lte]=1000&price[gte]=10
     search() {
         const keyword = this.queryStr.keyword ? {
             name: {

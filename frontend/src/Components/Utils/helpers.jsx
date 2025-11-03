@@ -1,26 +1,34 @@
+// Utils/helpers.jsx
+
 export const authenticate = (data, next) => {
-    if (window !== 'undefined') {
-        // console.log('authenticate', response)
-        sessionStorage.setItem('token', JSON.stringify(data.token));
+    if (typeof window !== 'undefined') {
+        // Store token as plain string, not JSON
+        sessionStorage.setItem('token', data.token);
+        // Store user as JSON string
         sessionStorage.setItem('user', JSON.stringify(data.user));
     }
     next();
 };
 
 export const getUser = () => {
-    if (window !== 'undefined') {
-        if (sessionStorage.getItem('user')) {
-            console.log(JSON.parse(sessionStorage.getItem('user')))
-            return JSON.parse(sessionStorage.getItem('user'));
+    if (typeof window !== 'undefined') {
+        const userStr = sessionStorage.getItem('user');
+        if (userStr) {
+            try {
+                return JSON.parse(userStr);
+            } catch (error) {
+                console.error('Error parsing user:', error);
+                return false;
+            }
         } else {
             return false;
         }
     }
 };
 
-// remove token from session storage
+// Remove token from session storage
 export const logout = next => {
-    if (window !== 'undefined') {
+    if (typeof window !== 'undefined') {
         sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
     }
@@ -28,9 +36,11 @@ export const logout = next => {
 };
 
 export const getToken = () => {
-    if (window !== 'undefined') {
-        if (sessionStorage.getItem('token')) {
-            return JSON.parse(sessionStorage.getItem('token'));
+    if (typeof window !== 'undefined') {
+        const token = sessionStorage.getItem('token');
+        if (token && token !== 'undefined' && token !== 'null') {
+            // Return token as-is, no JSON parsing needed
+            return token.trim();
         } else {
             return false;
         }

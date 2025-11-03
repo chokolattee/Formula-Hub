@@ -21,7 +21,7 @@
 
 # TERM TEST LAB 30pts
 
-- [] completed transaction. 10pts
+- [x] completed transaction. 10pts
 - [] admin updates the status of the transaction. 5pts 
 - [ ] email the customer of the updated transaction details. the email contains the list of products/services, their subtotal and grand total. 5pts
 - [ ] use FCM push notifications to inform the customer of the updated transaction. store the FCM registration token on the database 10pts

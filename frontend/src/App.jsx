@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { ToastContainer, } from 'react-toastify';
 
 import './App.css'
@@ -45,19 +45,26 @@ function App() {
 
   const addItemToCart = async (id, quantity) => {
     try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API}/product/${id}`)
+      const { data } = await axios.get(`http://localhost:8000/api/v1/getproduct/${id}`)
+      
+      const product = data.data;
+      
+      if (!product) {
+        throw new Error('Product not found');
+      }
+
       const item = {
-        product: data.product._id,
-        name: data.product.name,
-        price: data.product.price,
-        image: data.product.images[0].url,
-        stock: data.product.stock,
+        product: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.images && product.images[0] ? product.images[0].url : '/images/default_product.png',
+        stock: product.stock,
         quantity: quantity
       }
 
       const isItemExist = state.cartItems.find(i => i.product === item.product)
       
-      // Fix: Single state update instead of multiple
+      // Single state update instead of multiple
       const newCartItems = isItemExist 
         ? state.cartItems.map(i => i.product === item.product ? item : i)
         : [...state.cartItems, item];
@@ -67,12 +74,16 @@ function App() {
         cartItems: newCartItems
       })
 
+      // Also save to localStorage immediately
+      localStorage.setItem('cartItems', JSON.stringify(newCartItems))
+
       toast.success('Item Added to Cart', {
         position: 'bottom-right'
       })
 
     } catch (error) {
-      toast.error(error.message || 'Failed to add item to cart', {
+      console.error('Error adding to cart:', error);
+      toast.error(error.response?.data?.message || error.message || 'Failed to add item to cart', {
         position: 'top-left'
       });
     }
@@ -85,6 +96,10 @@ function App() {
       cartItems: newCartItems
     })
     localStorage.setItem('cartItems', JSON.stringify(newCartItems))
+    
+    toast.info('Item removed from cart', {
+      position: 'bottom-right'
+    })
   }
 
   const saveShippingInfo = async (data) => {
@@ -94,6 +109,16 @@ function App() {
     })
     localStorage.setItem('shippingInfo', JSON.stringify(data))
   }
+
+  const clearCart = useCallback(() => {
+    setState({
+      cartItems: [],
+      shippingInfo: {}
+    })
+    localStorage.removeItem('cartItems')
+    localStorage.removeItem('shippingInfo')
+    sessionStorage.removeItem('orderInfo')
+  }, [])
 
   return (
     <>
@@ -111,8 +136,8 @@ function App() {
           <Route path="/cart" element={<Cart cartItems={state.cartItems} addItemToCart={addItemToCart} removeItemFromCart={removeItemFromCart} />} exact="true" />
           <Route path="/shipping" element={<Shipping shipping={state.shippingInfo} saveShippingInfo={saveShippingInfo} />} />
           <Route path="/confirm" element={<ConfirmOrder cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} />
-          <Route path="/payment" element={<Payment cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} />
-          <Route path="/success" element={<OrderSuccess />} />
+          <Route path="/payment" element={<Payment cartItems={state.cartItems} shippingInfo={state.shippingInfo} clearCart={clearCart} />} />
+          <Route path="/success" element={<OrderSuccess clearCart={clearCart} />} />
           <Route path="/orders/me" element={<ListOrders />} />
           <Route path="/order/:id" element={<OrderDetails />} />
           

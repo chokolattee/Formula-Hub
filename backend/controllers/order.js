@@ -1,120 +1,226 @@
 const Order = require('../models/order');
 const Product = require('../models/product');
 
-// const ErrorHandler = require('../utils/errorHandler');
-
-// Create a new order   =>  /api/v1/order/new
 exports.newOrder = async (req, res, next) => {
-    const {
-        orderItems,
-        shippingInfo,
-        itemsPrice,
-        taxPrice,
-        shippingPrice,
-        totalPrice,
-        paymentInfo
+    try {
+        const {
+            orderItems,
+            shippingInfo,
+            itemsPrice,
+            taxPrice,
+            shippingPrice,
+            totalPrice,
+            paymentInfo
+        } = req.body;
 
-    } = req.body;
+        // Validate stock availability for all items before creating order
+        for (const item of orderItems) {
+            const product = await Product.findById(item.product);
+            
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Product not found: ${item.name}`
+                });
+            }
 
-    const order = await Order.create({
-        orderItems,
-        shippingInfo,
-        itemsPrice,
-        taxPrice,
-        shippingPrice,
-        totalPrice,
-        paymentInfo,
-        paidAt: Date.now(),
-        user: req.user._id
-    })
+            if (product.stock < item.quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
+                });
+            }
+        }
 
-    res.status(200).json({
-        success: true,
-        order
-    })
-}
+        // Create the order
+        const order = await Order.create({
+            orderItems,
+            shippingInfo,
+            itemsPrice,
+            taxPrice,
+            shippingPrice,
+            totalPrice,
+            paymentInfo,
+            paidAt: Date.now(),
+            user: req.user._id
+        });
+
+        // Update stock for each item after order is created
+        for (const item of orderItems) {
+            await updateStock(item.product, item.quantity);
+        }
+
+        res.status(200).json({
+            success: true,
+            order
+        });
+
+    } catch (error) {
+        console.error('Error creating order:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error creating order'
+        });
+    }
+};
 
 exports.myOrders = async (req, res, next) => {
-    const orders = await Order.find({ user: req.user.id })
-    // console.log(req.user)
-    res.status(200).json({
-        success: true,
-        orders
-    })
-}
+    try {
+        const orders = await Order.find({ user: req.user.id });
+        
+        res.status(200).json({
+            success: true,
+            orders
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 
 exports.getSingleOrder = async (req, res, next) => {
-    const order = await Order.findById(req.params.id).populate('user', 'name email')
-    if (!order) {
-        res.status(404).json({
-            message: 'No Order found with this ID',
-
-        })
+    try {
+        const order = await Order.findById(req.params.id).populate('user', 'name email');
+        
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'No Order found with this ID'
+            });
+        }
+        
+        res.status(200).json({
+            success: true,
+            order
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
-    res.status(200).json({
-        success: true,
-        order
-    })
-}
+};
 
 exports.allOrders = async (req, res, next) => {
-    const orders = await Order.find()
-    // console.log(orders)
-    let totalAmount = 0;
+    try {
+        const orders = await Order.find();
+        
+        let totalAmount = 0;
+        orders.forEach(order => {
+            totalAmount += order.totalPrice;
+        });
 
-    orders.forEach(order => {
-
-        totalAmount += order.totalPrice
-    })
-
-    res.status(200).json({
-        success: true,
-        totalAmount,
-        orders
-    })
-}
+        res.status(200).json({
+            success: true,
+            totalAmount,
+            orders
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 
 exports.deleteOrder = async (req, res, next) => {
-    const order = await Order.findByIdAndDelete(req.params.id)
+    try {
+        const order = await Order.findById(req.params.id);
 
-    if (!order) {
-        return res.status(400).json({
-            message: 'No Order found with this ID',
+        if (!order) {
+            return res.status(400).json({
+                success: false,
+                message: 'No Order found with this ID'
+            });
+        }
 
-        })
-      
+        // Optional: Restore stock when order is deleted
+        // Only if order status is not "Delivered"
+        if (order.orderStatus !== 'Delivered') {
+            for (const item of order.orderItems) {
+                await restoreStock(item.product, item.quantity);
+            }
+        }
+
+        await Order.findByIdAndDelete(req.params.id);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Order deleted successfully'
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
-    return res.status(200).json({
-        success: true
-    })
-}
+};
 
 exports.updateOrder = async (req, res, next) => {
-    const order = await Order.findById(req.params.id)
-    console.log(req.body.order)
-    if (order.orderStatus === 'Delivered') {
-        return res.status(400).json({
-            message: 'You have already delivered this order',
+    try {
+        const order = await Order.findById(req.params.id);
 
-        })
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'No Order found with this ID'
+            });
+        }
+
+        if (order.orderStatus === 'Delivered') {
+            return res.status(400).json({
+                success: false,
+                message: 'You have already delivered this order'
+            });
+        }
+
+        // Update order status
+        order.orderStatus = req.body.status;
+        
+        // Set delivered date if status is "Delivered"
+        if (req.body.status === 'Delivered') {
+            order.deliveredAt = Date.now();
+        }
+
+        await order.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Order updated successfully',
+            order
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
     }
+};
 
-    order.orderItems.forEach(async item => {
-        await updateStock(item.product, item.quantity)
-    })
-
-    order.orderStatus = req.body.status
-    order.deliveredAt = Date.now()
-    await order.save()
-    res.status(200).json({
-        success: true,
-    })
-}
-
+// Helper function to update stock (decrease)
 async function updateStock(id, quantity) {
     const product = await Product.findById(id);
 
+    if (!product) {
+        throw new Error(`Product with ID ${id} not found`);
+    }
+
     product.stock = product.stock - quantity;
 
-    await product.save({ validateBeforeSave: false })
+    await product.save({ validateBeforeSave: false });
+}
+
+// Helper function to restore stock (increase) - for order cancellation
+async function restoreStock(id, quantity) {
+    const product = await Product.findById(id);
+
+    if (!product) {
+        throw new Error(`Product with ID ${id} not found`);
+    }
+
+    product.stock = product.stock + quantity;
+
+    await product.save({ validateBeforeSave: false });
 }

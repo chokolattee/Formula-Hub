@@ -65,7 +65,6 @@ const Users = () => {
         status: "active",
         birthday: "",
         gender: "",
-        contact_number: "",
         avatar: [],
         createdAt: "",
         updatedAt: "",
@@ -80,7 +79,6 @@ const Users = () => {
         status: "active",
         birthday: "",
         gender: "",
-        contact_number: "",
     });
 
     // Sidebar state
@@ -143,7 +141,6 @@ const Users = () => {
                 email: user.email || '',
                 role: user.role || 'user',
                 status: user.status || 'active',
-                contact_number: user.contact_number || '',
                 gender: user.gender || '',
                 birthday: user.birthday || '',
                 avatar: user.avatar || [],
@@ -165,7 +162,6 @@ const Users = () => {
             status: "active",
             birthday: "",
             gender: "",
-            contact_number: "",
         });
     };
 
@@ -188,7 +184,6 @@ const Users = () => {
                 email: userData.email,
                 role: userData.role,
                 status: userData.status,
-                contact_number: userData.contact_number,
                 gender: userData.gender,
                 birthday: userData.birthday,
             });
@@ -213,7 +208,6 @@ const Users = () => {
                 status: userData.status,
                 birthday: userData.birthday,
                 gender: userData.gender,
-                contact_number: userData.contact_number,
                 avatar: userData.avatar || [],
                 createdAt: new Date(userData.createdAt).toLocaleString(),
                 updatedAt: new Date(userData.updatedAt).toLocaleString(),
@@ -662,14 +656,6 @@ const Users = () => {
                                 variant="outlined"
                                 required
                             />
-                            <TextField
-                                name="contact_number"
-                                label="Contact Number"
-                                value={formState.contact_number}
-                                onChange={(e) => setFormState({ ...formState, contact_number: e.target.value })}
-                                fullWidth
-                                variant="outlined"
-                            />
                             <FormControl fullWidth variant="outlined">
                                 <InputLabel>Gender</InputLabel>
                                 <Select
@@ -1043,43 +1029,6 @@ const Users = () => {
                                 </Box>
                             </Box>
 
-                            {/* Contact Information Section */}
-                            <Box sx={{
-                                backgroundColor: '#fafafa',
-                                padding: '16px',
-                                borderRadius: '8px',
-                                border: '1px solid #e0e0e0'
-                            }}>
-                                <Typography variant="h6" sx={{
-                                    color: '#c62828',
-                                    fontWeight: 600,
-                                    mb: 2,
-                                    fontSize: '1.25rem',
-                                    borderBottom: '2px solid #c62828',
-                                    paddingBottom: '8px'
-                                }}>
-                                    Contact Information
-                                </Typography>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                                    <Box sx={{ gridColumn: 'span 2' }}>
-                                        <Typography sx={{ fontSize: '0.9rem', color: '#757575', fontWeight: 600 }}>
-                                            Email
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '1.1rem', color: '#212121', fontWeight: 500, mt: 0.5 }}>
-                                            {currentUser.email || 'N/A'}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography sx={{ fontSize: '0.9rem', color: '#757575', fontWeight: 600 }}>
-                                            Contact Number
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '1.1rem', color: '#212121', fontWeight: 500, mt: 0.5 }}>
-                                            {currentUser.contact_number || 'N/A'}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Box>
-
                             {/* Account Information Section */}
                             <Box sx={{
                                 backgroundColor: '#fafafa',
@@ -1235,9 +1184,6 @@ function Row(props) {
                                 User Details
                             </Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                                <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
-                                    <strong style={{ color: '#ffffff' }}>Contact Number:</strong> {row.contact_number || 'N/A'}
-                                </Typography>
                                 <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
                                     <strong style={{ color: '#ffffff' }}>Gender:</strong> {row.gender || 'N/A'}
                                 </Typography>

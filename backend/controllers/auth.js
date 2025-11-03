@@ -348,13 +348,34 @@ exports.resetPassword = async (req, res, next) => {
 /*User Profile*/
 
 exports.getUserProfile = async (req, res, next) => {
-    const user = await User.findById(req.user.id);
-    console.log(user)
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
 
-    return res.status(200).json({
-        success: true,
-        user
-    })
+        console.log('User Profile:', {
+            id: user._id,
+            name: `${user.first_name} ${user.last_name}`,
+            email: user.email
+        });
+
+        return res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching user profile',
+            error: error.message
+        });
+    }
 }
 
 exports.updateProfile = async (req, res, next) => {

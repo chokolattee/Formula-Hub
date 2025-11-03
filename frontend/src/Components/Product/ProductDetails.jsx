@@ -68,9 +68,52 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
             navigate('/login');
             return;
         }
-        await addItemToCart(id, quantity);
-        toast.success('Item added to cart');
-
+        
+        if (!product) {
+            toast.error('Product information not available');
+            return;
+        }
+        
+        try {
+            // If addItemToCart prop exists, use it
+            if (addItemToCart) {
+                await addItemToCart(id, quantity);
+            } else {
+                // Fallback: Add to cart locally
+                const cartItem = {
+                    product: id, 
+                    name: product.name,
+                    price: product.price,
+                    image: product.images && product.images[0] ? product.images[0].url : '/images/default_product.png',
+                    stock: product.stock,
+                    quantity: quantity
+                };
+                
+                // Get existing cart items
+                const existingCart = JSON.parse(localStorage.getItem('cartItems') || '[]');
+                
+                // Check if item already exists
+                const existingItemIndex = existingCart.findIndex(item => item.product === id);
+                
+                if (existingItemIndex > -1) {
+                    // Update quantity
+                    existingCart[existingItemIndex].quantity = quantity;
+                } else {
+                    // Add new item
+                    existingCart.push(cartItem);
+                }
+                
+                // Save to localStorage
+                localStorage.setItem('cartItems', JSON.stringify(existingCart));
+            }
+            
+            toast.success('Item added to cart');
+            // Navigate to cart page
+            navigate('/cart');
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            toast.error('Failed to add item to cart');
+        }
     }
 
     if (loggedUser && cartItems) {
@@ -116,12 +159,12 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                 <div className="thumbnail-gallery">
                                     {productImages.map((image, index) => (
                                         <div
-                                            key={image.public_id || index}
+                                            key={image?.public_id || `thumb-${index}`}
                                             className={`thumbnail-item ${selectedImage === index ? 'active' : ''}`}
                                             onClick={() => setSelectedImage(index)}
                                         >
                                             <img
-                                                src={image.url}
+                                                src={image?.url || '/images/default_product.png'}
                                                 alt={`${product.name} ${index + 1}`}
                                                 className="thumbnail-image"
                                             />
@@ -132,7 +175,7 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                 {/* Main Image - Right Side of Thumbnails */}
                                 <div className="main-image-wrapper">
                                     <img
-                                        src={productImages[selectedImage].url}
+                                        src={productImages[selectedImage]?.url || '/images/default_product.png'}
                                         alt={product.name}
                                         className="main-product-image"
                                     />
@@ -301,12 +344,12 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
 
                                     <div className="reviews-list">
                                         {product.reviews.map((review, index) => (
-                                            <div key={review._id || index} className="review-card">
+                                            <div key={review?._id || `review-${index}`} className="review-card">
                                                 <div className="row">
                                                     <div className="col-md-1 col-2">
                                                         <img
-                                                            src={review.avatar || '/images/default_avatar.jpg'}
-                                                            alt="loggedUser"
+                                                            src={review?.avatar || '/images/default_avatar.jpg'}
+                                                            alt="User"
                                                             className="review-avatar"
                                                         />
                                                     </div>
@@ -318,17 +361,17 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                                                 </div>
                                                                 <div
                                                                     className="rating-inner"
-                                                                    style={{ width: `${(review.rating / 5) * 100}%` }}
+                                                                    style={{ width: `${((review?.rating || 0) / 5) * 100}%` }}
                                                                 >
                                                                     ★★★★★
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <p className="review-author">
-                                                            {review.name || 'Anonymous'}
+                                                            {review?.name || 'Anonymous'}
                                                         </p>
                                                         <p className="review-comment">
-                                                            {review.comment}
+                                                            {review?.comment || 'No comment provided'}
                                                         </p>
                                                     </div>
                                                 </div>
