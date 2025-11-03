@@ -5,7 +5,31 @@ import CheckoutSteps from './CheckoutSteps'
 import { getToken } from '../Utils/helpers'
 import { toast } from 'react-toastify'
 import axios from 'axios'
-import '../../Styles/confirmOrder.css'
+import {
+    Box,
+    Container,
+    Grid,
+    Card,
+    CardContent,
+    Typography,
+    Button,
+    Divider,
+    Avatar,
+    Alert,
+    Paper,
+    Chip
+} from '@mui/material'
+import {
+    LocalShipping,
+    ShoppingCart,
+    Lock,
+    ArrowBack,
+    Shield,
+    LocalShippingOutlined,
+    Undo,
+    CheckCircle,
+    Info
+} from '@mui/icons-material'
 
 const ConfirmOrder = ({cartItems, shippingInfo}) => {
     const [user, setUser] = useState(null)
@@ -34,7 +58,7 @@ const ConfirmOrder = ({cartItems, shippingInfo}) => {
                     }
                 }
 
-                const { data } = await axios.get('http://localhost:8000/api/v1/me', config)
+                const { data } = await axios.get(`${import.meta.env.VITE_API}/me`, config)
                 
                 if (data.success && data.user) {
                     setUser(data.user)
@@ -84,7 +108,6 @@ const ConfirmOrder = ({cartItems, shippingInfo}) => {
         navigate('/payment', { state: { fromConfirm: true } })
     }
 
-
     const getUserFullName = () => {
         if (!user) return 'Guest'
         
@@ -108,185 +131,350 @@ const ConfirmOrder = ({cartItems, shippingInfo}) => {
             <MetaData title={'Confirm Order'} />
             <CheckoutSteps shipping confirmOrder />
             
-            <div className="confirm-order-wrapper">
-                <div className="container-fluid">
-                    <div className="row justify-content-center">
-                        <div className="col-12 col-xl-10">
-                            <div className="row">
-                                {/* Left Column - Order Details */}
-                                <div className="col-12 col-lg-7 col-xl-8">
-                                    <div className="card shipping-info-card fade-in" style={{ marginBottom: "12px" }}>
-    <div className="card-body" style={{ padding: "12px 16px" }}>
-        <h4 className="section-title" style={{ marginBottom: "8px" }}>
-            <i className="fa fa-shipping-fast section-icon"></i>
-            Shipping Information
-        </h4>
-        
-        {user && (
-            <div className="user-info">
-                <p className="info-row" style={{ marginBottom: "4px", lineHeight: "1.3" }}>
-                    <strong className="info-label">Name:</strong> 
-                    <span className="info-value">{getUserFullName()}</span>
-                </p>
-                <p className="info-row" style={{ marginBottom: "4px", lineHeight: "1.3" }}>
-                    <strong className="info-label">Email:</strong> 
-                    <span className="info-value">{user.email}</span>
-                </p>
-            </div>
-        )}
-        
-        <p className="info-row" style={{ marginBottom: "4px", lineHeight: "1.3" }}>
-            <strong className="info-label">Phone:</strong> 
-            <span className="info-value">{shippingInfo.phoneNo}</span>
-        </p>
-        
-        <p className="info-row" style={{ marginBottom: "0", paddingBottom: "0", lineHeight: "1.3" }}>
-            <strong className="info-label">Address:</strong> 
-            <span className="info-value">
-                {`${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`}
-            </span>
-        </p>
-    </div>
-</div>
+            <Container maxWidth="xl" sx={{ mt: { xs: 12, md: 15 }, mb: 6, px: { xs: 2, sm: 3, md: 4 } }}>
+                <Grid container spacing={3} justifyContent="center">
+                    <Grid item xs={12} xl={10}>
+                        <Grid container spacing={3}>
+                            {/* Left Column - Order Details */}
+                            <Grid item xs={12} lg={7} xl={8}>
+                                {/* Shipping Information */}
+                                <Card sx={{ 
+                                    bgcolor: '#1a1a1a', 
+                                    border: '1px solid #333',
+                                    mb: 3
+                                }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box display="flex" alignItems="center" mb={2}>
+                                            <LocalShipping sx={{ color: '#dc3545', mr: 1.5, fontSize: 28 }} />
+                                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600 }}>
+                                                Shipping Information
+                                            </Typography>
+                                        </Box>
 
+                                        {user && (
+                                            <>
+                                                <Box mb={1.5}>
+                                                    <Typography variant="body2" sx={{ color: '#999', mb: 0.5 }}>
+                                                        Name
+                                                    </Typography>
+                                                    <Typography sx={{ color: '#fff', fontWeight: 500 }}>
+                                                        {getUserFullName()}
+                                                    </Typography>
+                                                </Box>
 
-                                    <div className="card order-items-card fade-in">
-                                        <div className="card-body">
-                                            <h4 className="section-title">
-                                                <i className="fa fa-shopping-cart section-icon"></i>
-                                                Order Items ({cartItems.length})
-                                            </h4>
+                                                <Box mb={1.5}>
+                                                    <Typography variant="body2" sx={{ color: '#999', mb: 0.5 }}>
+                                                        Email
+                                                    </Typography>
+                                                    <Typography sx={{ color: '#fff', fontWeight: 500 }}>
+                                                        {user.email}
+                                                    </Typography>
+                                                </Box>
+                                            </>
+                                        )}
 
-                                            <div className="items-container">
-                                                {cartItems.map((item, index) => (
-                                                    <div key={item.product} className="order-item">
-                                                        <div className="row align-items-center g-2">
-                                                            <div className="col-4 col-sm-3 col-md-2">
-                                                                <img 
-                                                                    src={item.image} 
-                                                                    alt={item.name} 
-                                                                    className="item-image"
-                                                                />
-                                                            </div>
+                                        <Box mb={1.5}>
+                                            <Typography variant="body2" sx={{ color: '#999', mb: 0.5 }}>
+                                                Phone
+                                            </Typography>
+                                            <Typography sx={{ color: '#fff', fontWeight: 500 }}>
+                                                {shippingInfo.phoneNo}
+                                            </Typography>
+                                        </Box>
 
-                                                            <div className="col-8 col-sm-5 col-md-6">
-                                                                <Link 
-                                                                    to={`/product/${item.product}`}
-                                                                    className="item-name-link"
-                                                                >
-                                                                    {item.name}
-                                                                </Link>
-                                                            </div>
+                                        <Box>
+                                            <Typography variant="body2" sx={{ color: '#999', mb: 0.5 }}>
+                                                Address
+                                            </Typography>
+                                            <Typography sx={{ color: '#fff', fontWeight: 500 }}>
+                                                {`${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
 
-                                                            <div className="col-12 col-sm-4 text-sm-end">
-                                                                <div className="item-pricing">
-                                                                    <div className="item-quantity">
-                                                                        {item.quantity} x ₱{item.price.toFixed(2)}
-                                                                    </div>
-                                                                    <div className="item-total-price">
-                                                                        ₱{(item.quantity * item.price).toFixed(2)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                {/* Order Items */}
+                                <Card sx={{ 
+                                    bgcolor: '#1a1a1a', 
+                                    border: '1px solid #333'
+                                }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box display="flex" alignItems="center" mb={3}>
+                                            <ShoppingCart sx={{ color: '#dc3545', mr: 1.5, fontSize: 28 }} />
+                                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600 }}>
+                                                Order Items
+                                            </Typography>
+                                            <Chip 
+                                                label={cartItems.length}
+                                                size="small"
+                                                sx={{ 
+                                                    ml: 2,
+                                                    bgcolor: '#dc3545',
+                                                    color: '#fff',
+                                                    fontWeight: 700
+                                                }}
+                                            />
+                                        </Box>
 
-                                {/* Right Column - Order Summary */}
-                                <div className="col-12 col-lg-5 col-xl-4">
-                                    <div className="summary-sticky-wrapper">
-                                        <div className="card order-summary-card fade-in">
-                                            <div className="card-body">
-                                                <h4 className="summary-title">Order Summary</h4>
-
-                                                <div className="price-breakdown">
-                                                    <div className="price-row">
-                                                        <span className="price-label">Subtotal:</span>
-                                                        <span className="price-value">₱{itemsPrice.toFixed(2)}</span>
-                                                    </div>
-
-                                                    <div className="price-row">
-                                                        <span className="price-label">Shipping:</span>
-                                                        <span className={`price-value ${shippingPrice === 0 ? 'free' : ''}`}>
-                                                            {shippingPrice === 0 ? 'FREE' : `₱${shippingPrice.toFixed(2)}`}
-                                                        </span>
-                                                    </div>
-
-                                                    {shippingPrice === 0 && (
-                                                        <div className="shipping-alert shipping-alert-success">
-                                                            <i className="fa fa-check-circle"></i>
-                                                            <span>You've qualified for free shipping!</span>
-                                                        </div>
-                                                    )}
-
-                                                    {shippingPrice > 0 && itemsPrice < 5000 && (
-                                                        <div className="shipping-alert shipping-alert-info">
-                                                            <i className="fa fa-info-circle"></i>
-                                                            <span>Add ₱{(5000 - itemsPrice).toFixed(2)} more for free shipping</span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="price-row">
-                                                        <span className="price-label">Tax (12% VAT):</span>
-                                                        <span className="price-value">₱{taxPrice}</span>
-                                                    </div>
-                                                </div>
-
-                                                <hr className="summary-divider" />
-
-                                                <div className="total-row">
-                                                    <span className="total-label">Total:</span>
-                                                    <span className="total-value">₱{totalPrice}</span>
-                                                </div>
-
-                                                <button 
-                                                    id="checkout_btn" 
-                                                    className="btn payment-btn" 
-                                                    onClick={processToPayment}
+                                        <Box>
+                                            {cartItems.map((item) => (
+                                                <Paper
+                                                    key={item.product}
+                                                    sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        p: 2,
+                                                        mb: 2,
+                                                        bgcolor: '#252525',
+                                                        backgroundImage: 'none',
+                                                        gap: 2,
+                                                        '&:last-child': { mb: 0 }
+                                                    }}
                                                 >
-                                                    <i className="fa fa-lock"></i>
-                                                    <span>Proceed to Payment</span>
-                                                </button>
+                                                    <Avatar
+                                                        src={item.image}
+                                                        alt={item.name}
+                                                        variant="rounded"
+                                                        sx={{ 
+                                                            width: { xs: 60, sm: 80 }, 
+                                                            height: { xs: 60, sm: 80 },
+                                                            border: '1px solid #333'
+                                                        }}
+                                                    />
+                                                    
+                                                    <Box flex={1} minWidth={0}>
+                                                        <Typography
+                                                            component={Link}
+                                                            to={`/product/${item.product}`}
+                                                            sx={{
+                                                                color: '#fff',
+                                                                fontSize: '15px',
+                                                                fontWeight: 500,
+                                                                textDecoration: 'none',
+                                                                display: 'block',
+                                                                mb: 1,
+                                                                '&:hover': {
+                                                                    color: '#dc3545'
+                                                                }
+                                                            }}
+                                                        >
+                                                            {item.name}
+                                                        </Typography>
+                                                        
+                                                        <Typography variant="body2" sx={{ color: '#999', mb: 0.5 }}>
+                                                            {item.quantity} × ₱{item.price.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
 
-                                                <Link 
-                                                    to="/cart" 
-                                                    className="btn back-to-cart-btn"
-                                                >
-                                                    <i className="fa fa-arrow-left"></i>
-                                                    <span>Back to Cart</span>
-                                                </Link>
+                                                    <Typography
+                                                        sx={{
+                                                            color: '#dc3545',
+                                                            fontSize: '18px',
+                                                            fontWeight: 700,
+                                                            whiteSpace: 'nowrap'
+                                                        }}
+                                                    >
+                                                        ₱{(item.quantity * item.price).toFixed(2)}
+                                                    </Typography>
+                                                </Paper>
+                                            ))}
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
 
-                                                <div className="security-badge">
-                                                    <i className="fa fa-shield-alt"></i>
+                            {/* Right Column - Order Summary */}
+                            <Grid item xs={12} lg={5} xl={4}>
+                                <Box sx={{ position: { lg: 'sticky' }, top: { lg: 100 } }}>
+                                    {/* Order Summary Card */}
+                                    <Card sx={{ 
+                                        bgcolor: '#1a1a1a', 
+                                        border: '1px solid #333',
+                                        mb: 3
+                                    }}>
+                                        <CardContent sx={{ p: 3 }}>
+                                            <Typography variant="h6" sx={{ 
+                                                color: '#fff', 
+                                                fontWeight: 600,
+                                                mb: 3
+                                            }}>
+                                                Order Summary
+                                            </Typography>
+
+                                            {/* Price Breakdown */}
+                                            <Box mb={3}>
+                                                <Box display="flex" justifyContent="space-between" mb={2}>
+                                                    <Typography sx={{ color: '#999' }}>
+                                                        Subtotal:
+                                                    </Typography>
+                                                    <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                        ₱{itemsPrice.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+
+                                                <Box display="flex" justifyContent="space-between" mb={2}>
+                                                    <Typography sx={{ color: '#999' }}>
+                                                        Shipping:
+                                                    </Typography>
+                                                    <Typography sx={{ 
+                                                        color: shippingPrice === 0 ? '#28a745' : '#fff',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        {shippingPrice === 0 ? 'FREE' : `₱${shippingPrice.toFixed(2)}`}
+                                                    </Typography>
+                                                </Box>
+
+                                                {/* Free Shipping Alert */}
+                                                {shippingPrice === 0 && (
+                                                    <Alert 
+                                                        icon={<CheckCircle />}
+                                                        severity="success"
+                                                        sx={{ 
+                                                            mb: 2,
+                                                            bgcolor: 'rgba(40, 167, 69, 0.1)',
+                                                            color: '#28a745',
+                                                            border: '1px solid rgba(40, 167, 69, 0.3)',
+                                                            '& .MuiAlert-icon': {
+                                                                color: '#28a745'
+                                                            }
+                                                        }}
+                                                    >
+                                                        You've qualified for free shipping!
+                                                    </Alert>
+                                                )}
+
+                                                {/* Almost Free Shipping Alert */}
+                                                {shippingPrice > 0 && itemsPrice < 5000 && (
+                                                    <Alert 
+                                                        icon={<Info />}
+                                                        severity="info"
+                                                        sx={{ 
+                                                            mb: 2,
+                                                            bgcolor: 'rgba(23, 162, 184, 0.1)',
+                                                            color: '#17a2b8',
+                                                            border: '1px solid rgba(23, 162, 184, 0.3)',
+                                                            '& .MuiAlert-icon': {
+                                                                color: '#17a2b8'
+                                                            }
+                                                        }}
+                                                    >
+                                                        Add ₱{(5000 - itemsPrice).toFixed(2)} more for free shipping
+                                                    </Alert>
+                                                )}
+
+                                                <Box display="flex" justifyContent="space-between">
+                                                    <Typography sx={{ color: '#999' }}>
+                                                        Tax (12% VAT):
+                                                    </Typography>
+                                                    <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                        ₱{taxPrice}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            <Divider sx={{ borderColor: '#333', mb: 3 }} />
+
+                                            {/* Total */}
+                                            <Box display="flex" justifyContent="space-between" mb={3}>
+                                                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600 }}>
+                                                    Total:
+                                                </Typography>
+                                                <Typography variant="h6" sx={{ 
+                                                    color: '#dc3545', 
+                                                    fontWeight: 700
+                                                }}>
+                                                    ₱{totalPrice}
+                                                </Typography>
+                                            </Box>
+
+                                            {/* Buttons */}
+                                            <Button
+                                                fullWidth
+                                                variant="contained"
+                                                startIcon={<Lock />}
+                                                onClick={processToPayment}
+                                                sx={{
+                                                    bgcolor: '#dc3545',
+                                                    color: '#fff',
+                                                    py: 1.5,
+                                                    fontWeight: 600,
+                                                    fontSize: '16px',
+                                                    mb: 2,
+                                                    '&:hover': {
+                                                        bgcolor: '#c82333'
+                                                    }
+                                                }}
+                                            >
+                                                Proceed to Payment
+                                            </Button>
+
+                                            <Button
+                                                fullWidth
+                                                component={Link}
+                                                to="/cart"
+                                                variant="outlined"
+                                                startIcon={<ArrowBack />}
+                                                sx={{
+                                                    borderColor: '#444',
+                                                    color: '#fff',
+                                                    py: 1.5,
+                                                    fontWeight: 600,
+                                                    mb: 2,
+                                                    '&:hover': {
+                                                        borderColor: '#666',
+                                                        bgcolor: 'rgba(255, 255, 255, 0.05)'
+                                                    }
+                                                }}
+                                            >
+                                                Back to Cart
+                                            </Button>
+
+                                            {/* Security Badge */}
+                                            <Box 
+                                                display="flex" 
+                                                alignItems="center" 
+                                                justifyContent="center"
+                                                gap={1}
+                                                sx={{
+                                                    color: '#999',
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                <Shield sx={{ fontSize: 18 }} />
+                                                <Typography variant="body2">
                                                     Your information is secure
-                                                </div>
-                                            </div>
-                                        </div>
+                                                </Typography>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
 
-                                        {/* Order Details Summary */}
-                                        <div className="card additional-info-card fade-in">
-                                            <div className="card-body">
-                                                <div className="info-item">
-                                                    <i className="fa fa-truck"></i>
-                                                    <span>Estimated delivery: 3-5 business days</span>
-                                                </div>
-                                                <div className="info-item">
-                                                    <i className="fa fa-undo"></i>
-                                                    <span>30-day return policy</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                                    {/* Additional Info Card */}
+                                    <Card sx={{ 
+                                        bgcolor: '#1a1a1a', 
+                                        border: '1px solid #333'
+                                    }}>
+                                        <CardContent sx={{ p: 3 }}>
+                                            <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+                                                <LocalShippingOutlined sx={{ color: '#dc3545', fontSize: 20 }} />
+                                                <Typography sx={{ color: '#fff', fontSize: '14px' }}>
+                                                    Estimated delivery: 3-5 business days
+                                                </Typography>
+                                            </Box>
+
+                                            <Box display="flex" alignItems="center" gap={1.5}>
+                                                <Undo sx={{ color: '#dc3545', fontSize: 20 }} />
+                                                <Typography sx={{ color: '#fff', fontSize: '14px' }}>
+                                                    30-day return policy
+                                                </Typography>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Container>
         </Fragment>
     )
 }
