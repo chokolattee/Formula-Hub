@@ -19,7 +19,17 @@ import {
     Paper,
     Divider,
     Tabs,
-    Tab
+    Tab,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Rating,
+    TextField,
+    IconButton,
+    ImageList,
+    ImageListItem,
+    ImageListItemBar
 } from '@mui/material'
 import {
     ShoppingBag,
@@ -29,7 +39,12 @@ import {
     CalendarToday,
     Inventory,
     LocalShipping,
-    CheckCircle
+    CheckCircle,
+    Cancel,
+    RateReview,
+    Close,
+    CloudUpload,
+    Delete
 } from '@mui/icons-material'
 
 const ListOrders = () => {
@@ -37,6 +52,18 @@ const ListOrders = () => {
     const [error, setError] = useState('')
     const [myOrdersList, setMyOrdersList] = useState([])
     const [activeTab, setActiveTab] = useState(0)
+    const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+    const [orderToCancel, setOrderToCancel] = useState(null)
+    const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+    const [reviewData, setReviewData] = useState({
+        orderId: '',
+        productId: '',
+        productName: '',
+        rating: 0,
+        comment: '',
+        images: []
+    })
+    const [imagePreview, setImagePreview] = useState([])
 
     const myOrders = async () => {
         try {
@@ -63,6 +90,124 @@ const ListOrders = () => {
         }
     }, [error])
 
+    const handleCancelOrder = async () => {
+        try {
+            const config = {
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                }
+            }
+            await axios.put(
+                `${import.meta.env.VITE_API}/order/cancel/${orderToCancel}`,
+                {},
+                config
+            )
+            toast.success('Order cancelled successfully', {
+                position: 'bottom-right'
+            })
+            setCancelDialogOpen(false)
+            setOrderToCancel(null)
+            myOrders()
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to cancel order', {
+                position: 'bottom-right'
+            })
+        }
+    }
+
+    const openReviewDialog = (orderId, productId, productName) => {
+        setReviewData({
+            orderId,
+            productId,
+            productName,
+            rating: 0,
+            comment: '',
+            images: []
+        })
+        setImagePreview([])
+        setReviewDialogOpen(true)
+    }
+
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files)
+        
+        if (files.length + imagePreview.length > 5) {
+            toast.error('Maximum 5 images allowed', {
+                position: 'bottom-right'
+            })
+            return
+        }
+
+        files.forEach(file => {
+            const reader = new FileReader()
+            reader.onload = () => {
+                if (reader.readyState === 2) {
+                    setImagePreview(prev => [...prev, reader.result])
+                    setReviewData(prev => ({
+                        ...prev,
+                        images: [...prev.images, reader.result]
+                    }))
+                }
+            }
+            reader.readAsDataURL(file)
+        })
+    }
+
+    const removeImage = (index) => {
+        setImagePreview(prev => prev.filter((_, i) => i !== index))
+        setReviewData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }))
+    }
+
+    const submitReview = async () => {
+        if (reviewData.rating === 0) {
+            toast.error('Please select a rating', {
+                position: 'bottom-right'
+            })
+            return
+        }
+
+        if (!reviewData.comment.trim()) {
+            toast.error('Please write a comment', {
+                position: 'bottom-right'
+            })
+            return
+        }
+
+        try {
+            const config = {
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+
+            await axios.post(
+                `${import.meta.env.VITE_API}/review`,
+                {
+                    orderId: reviewData.orderId,
+                    productId: reviewData.productId,
+                    rating: reviewData.rating,
+                    comment: reviewData.comment,
+                    images: reviewData.images
+                },
+                config
+            )
+
+            toast.success('Review submitted successfully', {
+                position: 'bottom-right'
+            })
+            setReviewDialogOpen(false)
+            myOrders()
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to submit review', {
+                position: 'bottom-right'
+            })
+        }
+    }
+
     const formatDate = (date) => {
         return new Date(date).toLocaleDateString('en-US', {
             year: 'numeric',
@@ -79,6 +224,8 @@ const ListOrders = () => {
                 return 'warning'
             case 'Shipped':
                 return 'info'
+            case 'Cancelled':
+                return 'error'
             default:
                 return 'default'
         }
@@ -90,14 +237,16 @@ const ListOrders = () => {
 
     const getFilteredOrders = () => {
         switch(activeTab) {
-            case 0: // All Orders
+            case 0:
                 return myOrdersList
-            case 1: // Processing
+            case 1:
                 return myOrdersList.filter(order => order.orderStatus === 'Processing')
-            case 2: // Shipped
+            case 2:
                 return myOrdersList.filter(order => order.orderStatus === 'Shipped')
-            case 3: // Delivered
+            case 3:
                 return myOrdersList.filter(order => order.orderStatus === 'Delivered')
+            case 4:
+                return myOrdersList.filter(order => order.orderStatus === 'Cancelled')
             default:
                 return myOrdersList
         }
@@ -109,6 +258,7 @@ const ListOrders = () => {
                 case 'Processing': return '#ffc107'
                 case 'Shipped': return '#17a2b8'
                 case 'Delivered': return '#28a745'
+                case 'Cancelled': return '#dc3545'
                 default: return '#666'
             }
         }
@@ -132,9 +282,7 @@ const ListOrders = () => {
                 }}
             >
                 <CardContent sx={{ p: 4 }}>
-                    {/* Order Header */}
                     <Grid container spacing={3} alignItems="center" mb={3}>
-                        {/* Order ID & Date */}
                         <Grid item xs={12} sm={6} md={3}>
                             <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
                                 Order ID
@@ -150,7 +298,6 @@ const ListOrders = () => {
                             </Box>
                         </Grid>
 
-                        {/* Items Count */}
                         <Grid item xs={6} sm={3} md={2}>
                             <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
                                 Items
@@ -160,7 +307,6 @@ const ListOrders = () => {
                             </Typography>
                         </Grid>
 
-                        {/* Total Amount */}
                         <Grid item xs={6} sm={3} md={2}>
                             <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
                                 Total
@@ -170,8 +316,7 @@ const ListOrders = () => {
                             </Typography>
                         </Grid>
 
-                        {/* Status */}
-                        <Grid item xs={6} sm={6} md={3}>
+                        <Grid item xs={12} sm={6} md={3}>
                             <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
                                 Status
                             </Typography>
@@ -185,33 +330,61 @@ const ListOrders = () => {
                                     Delivered: {formatDate(order.deliveredAt)}
                                 </Typography>
                             )}
+                            {order.cancelledAt && (
+                                <Typography variant="caption" sx={{ color: '#dc3545', display: 'block', mt: 0.5 }}>
+                                    Cancelled: {formatDate(order.cancelledAt)}
+                                </Typography>
+                            )}
                         </Grid>
 
-                        {/* Action Button */}
-                        <Grid item xs={6} sm={6} md={2} sx={{ textAlign: { md: 'right' } }}>
-                            <Button
-                                component={Link}
-                                to={`/order/${order._id}`}
-                                variant="outlined"
-                                startIcon={<Visibility />}
-                                sx={{
-                                    color: '#fff',
-                                    borderColor: '#444',
-                                    fontWeight: 600,
-                                    '&:hover': {
-                                        bgcolor: '#dc3545',
-                                        borderColor: '#dc3545'
-                                    }
-                                }}
-                            >
-                                View
-                            </Button>
+                        <Grid item xs={12} md={2}>
+                            <Box display="flex" flexDirection="column" gap={1}>
+                                <Button
+                                    component={Link}
+                                    to={`/order/${order._id}`}
+                                    variant="outlined"
+                                    startIcon={<Visibility />}
+                                    fullWidth
+                                    sx={{
+                                        color: '#fff',
+                                        borderColor: '#444',
+                                        fontWeight: 600,
+                                        '&:hover': {
+                                            bgcolor: '#dc3545',
+                                            borderColor: '#dc3545'
+                                        }
+                                    }}
+                                >
+                                    View
+                                </Button>
+                                {order.orderStatus === 'Processing' && (
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<Cancel />}
+                                        fullWidth
+                                        onClick={() => {
+                                            setOrderToCancel(order._id)
+                                            setCancelDialogOpen(true)
+                                        }}
+                                        sx={{
+                                            color: '#dc3545',
+                                            borderColor: '#dc3545',
+                                            fontWeight: 600,
+                                            '&:hover': {
+                                                bgcolor: '#dc3545',
+                                                color: '#fff'
+                                            }
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                )}
+                            </Box>
                         </Grid>
                     </Grid>
 
                     <Divider sx={{ borderColor: '#333', mb: 3 }} />
 
-                    {/* Order Items */}
                     <Box mb={2}>
                         <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
                             Order Items
@@ -253,21 +426,38 @@ const ListOrders = () => {
                                         Qty: {item.quantity} × ₱{item.price.toFixed(2)}
                                     </Typography>
                                 </Box>
-                                <Typography
-                                    sx={{
-                                        color: '#dc3545',
-                                        fontSize: '16px',
-                                        fontWeight: 700,
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    ₱{(item.quantity * item.price).toFixed(2)}
-                                </Typography>
+                                <Box display="flex" flexDirection="column" alignItems="flex-end" gap={1}>
+                                    <Typography
+                                        sx={{
+                                            color: '#dc3545',
+                                            fontSize: '16px',
+                                            fontWeight: 700,
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        ₱{(item.quantity * item.price).toFixed(2)}
+                                    </Typography>
+                                    {order.orderStatus === 'Delivered' && (
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            startIcon={<RateReview />}
+                                            onClick={() => openReviewDialog(order._id, item.product, item.name)}
+                                            sx={{
+                                                bgcolor: '#28a745',
+                                                '&:hover': { bgcolor: '#218838' },
+                                                fontSize: '12px',
+                                                py: 0.5
+                                            }}
+                                        >
+                                            Review
+                                        </Button>
+                                    )}
+                                </Box>
                             </Paper>
                         ))}
                     </Box>
 
-                    {/* Shipping Address */}
                     <Box display="flex" alignItems="center" gap={1}>
                         <LocationOn sx={{ fontSize: 16, color: '#dc3545' }} />
                         <Typography variant="body2" sx={{ color: '#999' }}>
@@ -282,6 +472,7 @@ const ListOrders = () => {
     const processingCount = myOrdersList.filter(order => order.orderStatus === 'Processing').length
     const shippedCount = myOrdersList.filter(order => order.orderStatus === 'Shipped').length
     const deliveredCount = myOrdersList.filter(order => order.orderStatus === 'Delivered').length
+    const cancelledCount = myOrdersList.filter(order => order.orderStatus === 'Cancelled').length
     const filteredOrders = getFilteredOrders()
 
     return (
@@ -302,7 +493,6 @@ const ListOrders = () => {
                     <Loader />
                 ) : (
                     <>
-                        {/* Tabs */}
                         <Box sx={{ mb: 4 }}>
                             <Tabs
                                 value={activeTab}
@@ -427,10 +617,36 @@ const ListOrders = () => {
                                         fontSize: '15px'
                                     }}
                                 />
+                                <Tab
+                                    icon={<Cancel />}
+                                    iconPosition="start"
+                                    label={
+                                        <Box display="flex" alignItems="center" gap={1}>
+                                            Cancelled
+                                            <Chip 
+                                                label={cancelledCount} 
+                                                size="small"
+                                                sx={{ 
+                                                    bgcolor: activeTab === 4 ? '#dc3545' : '#333',
+                                                    color: '#fff',
+                                                    fontWeight: 700,
+                                                    height: 20,
+                                                    fontSize: '11px'
+                                                }} 
+                                            />
+                                        </Box>
+                                    }
+                                    sx={{
+                                        color: '#999',
+                                        fontWeight: 600,
+                                        '&.Mui-selected': { color: '#fff' },
+                                        textTransform: 'none',
+                                        fontSize: '15px'
+                                    }}
+                                />
                             </Tabs>
                         </Box>
 
-                        {/* Orders Content */}
                         {myOrdersList.length === 0 ? (
                             <Card sx={{ bgcolor: '#1a1a1a', border: '1px solid #333' }}>
                                 <CardContent sx={{ textAlign: 'center', py: 8 }}>
@@ -476,6 +692,186 @@ const ListOrders = () => {
                     </>
                 )}
             </Container>
+
+            {/* Cancel Order Dialog */}
+            <Dialog
+                open={cancelDialogOpen}
+                onClose={() => setCancelDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#1a1a1a',
+                        border: '1px solid #333',
+                        minWidth: '400px'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 600 }}>
+                    Cancel Order
+                </DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ color: '#999' }}>
+                        Are you sure you want to cancel this order? This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button
+                        onClick={() => setCancelDialogOpen(false)}
+                        sx={{ color: '#999' }}
+                    >
+                        No, Keep Order
+                    </Button>
+                    <Button
+                        onClick={handleCancelOrder}
+                        variant="contained"
+                        sx={{
+                            bgcolor: '#dc3545',
+                            '&:hover': { bgcolor: '#c82333' }
+                        }}
+                    >
+                        Yes, Cancel Order
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Review Dialog */}
+            <Dialog
+                open={reviewDialogOpen}
+                onClose={() => setReviewDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#1a1a1a',
+                        border: '1px solid #333'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    Write a Review
+                    <IconButton onClick={() => setReviewDialogOpen(false)} sx={{ color: '#999' }}>
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    <Box mb={3}>
+                        <Typography sx={{ color: '#999', mb: 1 }}>
+                            Product: {reviewData.productName}
+                        </Typography>
+                    </Box>
+
+                    <Box mb={3}>
+                        <Typography sx={{ color: '#fff', mb: 1 }}>Rating *</Typography>
+                        <Rating
+                            value={reviewData.rating}
+                            onChange={(event, newValue) => {
+                                setReviewData({ ...reviewData, rating: newValue })
+                            }}
+                            size="large"
+                            sx={{
+                                '& .MuiRating-iconFilled': {
+                                    color: '#ffc107'
+                                }
+                            }}
+                        />
+                    </Box>
+
+                    <Box mb={3}>
+                        <Typography sx={{ color: '#fff', mb: 1 }}>Review *</Typography>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            placeholder="Share your thoughts about this product..."
+                            value={reviewData.comment}
+                            onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    color: '#fff',
+                                    '& fieldset': {
+                                        borderColor: '#444'
+                                    },
+                                    '&:hover fieldset': {
+                                        borderColor: '#666'
+                                    }
+                                }
+                            }}
+                        />
+                    </Box>
+
+                    <Box mb={3}>
+                        <Typography sx={{ color: '#fff', mb: 1 }}>Photos (Optional - Max 5)</Typography>
+                        <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<CloudUpload />}
+                            sx={{
+                                color: '#fff',
+                                borderColor: '#444',
+                                '&:hover': {
+                                    borderColor: '#666'
+                                }
+                            }}
+                        >
+                            Upload Images
+                            <input
+                                type="file"
+                                hidden
+                                accept="image/*"
+                                multiple
+                                onChange={handleImageChange}
+                            />
+                        </Button>
+
+                        {imagePreview.length > 0 && (
+                            <ImageList cols={3} gap={8} sx={{ mt: 2 }}>
+                                {imagePreview.map((img, index) => (
+                                    <ImageListItem key={index}>
+                                        <img
+                                            src={img}
+                                            alt={`Preview ${index + 1}`}
+                                            loading="lazy"
+                                            style={{ height: 100, objectFit: 'cover' }}
+                                        />
+                                        <ImageListItemBar
+                                            sx={{
+                                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0) 100%)',
+                                            }}
+                                            position="top"
+                                            actionIcon={
+                                                <IconButton
+                                                    sx={{ color: 'white' }}
+                                                    onClick={() => removeImage(index)}
+                                                >
+                                                    <Delete />
+                                                </IconButton>
+                                            }
+                                            actionPosition="right"
+                                        />
+                                    </ImageListItem>
+                                ))}
+                            </ImageList>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button
+                        onClick={() => setReviewDialogOpen(false)}
+                        sx={{ color: '#999' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={submitReview}
+                        variant="contained"
+                        sx={{
+                            bgcolor: '#28a745',
+                            '&:hover': { bgcolor: '#218838' }
+                        }}
+                    >
+                        Submit Review
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     )
 }
