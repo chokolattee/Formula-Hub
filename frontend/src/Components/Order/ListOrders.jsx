@@ -85,7 +85,7 @@ const ListOrders = () => {
         }
     }
 
-    const fetchMyReviews = async () => {
+        const fetchMyReviews = async () => {
         try {
             const config = {
                 headers: {
@@ -93,9 +93,11 @@ const ListOrders = () => {
                 }
             }
             const { data } = await axios.get(`${import.meta.env.VITE_API}/reviews/me`, config)
-            setMyReviews(data.data || [])
+            if (data.success) {
+                setMyReviews(data.data)
+            }
         } catch (error) {
-            console.error('Failed to fetch reviews:', error)
+            console.error('Error fetching reviews:', error)
         }
     }
 
@@ -109,12 +111,22 @@ const ListOrders = () => {
         }
     }, [error])
 
-    const hasReviewed = (productId) => {
-        return myReviews.some(review => review.product._id === productId || review.product === productId)
+    const hasReviewed = (productId, orderId) => {
+        return myReviews.some(review => {
+            const reviewProductId = review.product._id || review.product;
+            const reviewOrderId = review.order._id || review.order;
+            
+            return reviewProductId === productId && reviewOrderId === orderId;
+        });
     }
 
-    const getProductReview = (productId) => {
-        return myReviews.find(review => review.product._id === productId || review.product === productId)
+    const getProductReview = (productId, orderId) => {
+        return myReviews.find(review => {
+            const reviewProductId = review.product._id || review.product;
+            const reviewOrderId = review.order._id || review.order;
+            
+            return reviewProductId === productId && reviewOrderId === orderId;
+        });
     }
 
     const handleCancelOrder = async () => {
@@ -155,8 +167,8 @@ const ListOrders = () => {
         setReviewDialogOpen(true)
     }
 
-    const openViewReviewDialog = (productId) => {
-        const review = getProductReview(productId)
+    const openViewReviewDialog = (productId, orderId) => {
+        const review = getProductReview(productId, orderId)
         if (review) {
             setSelectedReview(review)
             setViewReviewDialogOpen(true)
@@ -493,41 +505,44 @@ const ListOrders = () => {
                                         ₱{(item.quantity * item.price).toFixed(2)}
                                     </Typography>
                                     {order.orderStatus === 'Delivered' && (
-                                        hasReviewed(item.product) ? (
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                startIcon={<RemoveRedEye />}
-                                                onClick={() => openViewReviewDialog(item.product)}
-                                                sx={{
-                                                    color: '#17a2b8',
-                                                    borderColor: '#17a2b8',
-                                                    '&:hover': { 
-                                                        bgcolor: '#17a2b8',
-                                                        color: '#fff'
-                                                    },
-                                                    fontSize: '12px',
-                                                    py: 0.5
-                                                }}
-                                            >
-                                                View Review
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                size="small"
-                                                variant="contained"
-                                                startIcon={<RateReview />}
-                                                onClick={() => openReviewDialog(order._id, item.product, item.name)}
-                                                sx={{
-                                                    bgcolor: '#28a745',
-                                                    '&:hover': { bgcolor: '#218838' },
-                                                    fontSize: '12px',
-                                                    py: 0.5
-                                                }}
-                                            >
-                                                Review
-                                            </Button>
-                                        )
+                                        (() => {
+                                            const reviewed = hasReviewed(item.product, order._id);
+                                            return reviewed ? (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<RemoveRedEye />}
+                                                    onClick={() => openViewReviewDialog(item.product, order._id)}
+                                                    sx={{
+                                                        color: '#17a2b8',
+                                                        borderColor: '#17a2b8',
+                                                        '&:hover': { 
+                                                            bgcolor: '#17a2b8',
+                                                            color: '#fff'
+                                                        },
+                                                        fontSize: '12px',
+                                                        py: 0.5
+                                                    }}
+                                                >
+                                                    View Review
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    startIcon={<RateReview />}
+                                                    onClick={() => openReviewDialog(order._id, item.product, item.name)}
+                                                    sx={{
+                                                        bgcolor: '#28a745',
+                                                        '&:hover': { bgcolor: '#218838' },
+                                                        fontSize: '12px',
+                                                        py: 0.5
+                                                    }}
+                                                >
+                                                    Write Review
+                                                </Button>
+                                            );
+                                        })()
                                     )}
                                 </Box>
                             </Paper>

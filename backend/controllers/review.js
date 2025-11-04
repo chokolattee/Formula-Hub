@@ -1,12 +1,13 @@
 const Review = require('../models/review');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary');
+const filterBadWords = require('../utils/wordFilter');
 
 exports.getMyReviews = async (req, res) => {
     try {
         const reviews = await Review.find({ user: req.user._id })
             .populate('product', 'name images price')
-            .populate('order', 'orderStatus')
+            .populate('order')
             .sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -53,6 +54,7 @@ exports.getReviews = async (req, res) => {
         const reviews = await Review.find(filter)
             .populate('user', 'name email first_name last_name avatar')
             .populate('product', 'name images price')
+            .populate('order', 'orderNumber createdAt')  
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -210,7 +212,7 @@ exports.createReview = async (req, res) => {
             });
         }
 
-        // Check if user already reviewed this product for this order
+        // Check if user already reviewed this product for this specific order
         const existingReview = await Review.findOne({
             user: req.user._id,
             product: product,
@@ -220,7 +222,7 @@ exports.createReview = async (req, res) => {
         if (existingReview) {
             return res.status(400).json({
                 success: false,
-                message: 'You have already reviewed this product for this order.',
+                message: 'You have already reviewed this product for this specific order.',
             });
         }
 
@@ -261,12 +263,15 @@ exports.createReview = async (req, res) => {
             }
         }
 
+        // Filter bad words from the comment
+        const filteredComment = await filterBadWords(comment);
+
         const reviewData = {
             user: req.user._id,
             product: product,
             order: orderId,
             rating: ratingNum,
-            comment,
+            comment: filteredComment,
             images: uploadedImages,
         };
 
@@ -334,7 +339,7 @@ exports.updateReview = async (req, res) => {
         }
 
         if (comment) {
-            updateData.comment = comment;
+            updateData.comment = await filterBadWords(comment);
         }
 
         if (req.files && req.files.length > 0) {
