@@ -51,7 +51,7 @@ exports.newOrder = async (req, res, next) => {
             await updateStock(item.product, item.quantity);
         }
 
-        await order.populate('user', 'name email');
+        await order.populate('user', 'name email first_name last_name');
 
         // Send order confirmation email
         try {
@@ -97,7 +97,8 @@ exports.myOrders = async (req, res, next) => {
 
 exports.getSingleOrder = async (req, res, next) => {
     try {
-        const order = await Order.findById(req.params.id).populate('user', 'name email');
+        const order = await Order.findById(req.params.id)
+            .populate('user', 'name email first_name last_name');
         
         if (!order) {
             return res.status(404).json({
@@ -121,7 +122,7 @@ exports.getSingleOrder = async (req, res, next) => {
 exports.allOrders = async (req, res, next) => {
     try {
         const orders = await Order.find()
-            .populate('user', 'name email')
+            .populate('user', 'name email first_name last_name')
             .sort({ createdAt: -1 });
         
         let totalAmount = 0;
@@ -176,7 +177,8 @@ exports.deleteOrder = async (req, res, next) => {
 
 exports.updateOrder = async (req, res, next) => {
     try {
-        const order = await Order.findById(req.params.id).populate('user', 'name email first_name last_name');
+        const order = await Order.findById(req.params.id)
+            .populate('user', 'name email first_name last_name');
 
         if (!order) {
             return res.status(404).json({
@@ -210,18 +212,16 @@ exports.updateOrder = async (req, res, next) => {
             for (const item of order.orderItems) {
                 await restoreStock(item.product, item.quantity);
             }
-            console.log(`✅ Stock restored for cancelled order ${order._id}`);
+            console.log(`Stock restored for cancelled order ${order._id}`);
         }
 
         // Update order status
         order.orderStatus = newStatus;
         
-        // Set delivered date if status is "Delivered"
         if (newStatus === 'Delivered') {
             order.deliveredAt = Date.now();
         }
 
-        // Set cancelled date if status is "Cancelled"
         if (newStatus === 'Cancelled') {
             order.cancelledAt = Date.now();
         }
@@ -238,9 +238,9 @@ exports.updateOrder = async (req, res, next) => {
                 html: emailHTML
             });
 
-            console.log(`✅ Status update email sent to ${order.user.email} for order ${order._id}`);
+            console.log(`Status update email sent to ${order.user.email} for order ${order._id}`);
         } catch (emailError) {
-            console.error('❌ Failed to send status update email:', emailError);
+            console.error('Failed to send status update email:', emailError);
         }
 
         res.status(200).json({
@@ -259,7 +259,8 @@ exports.updateOrder = async (req, res, next) => {
 
 exports.cancelOrder = async (req, res, next) => {
     try {
-        const order = await Order.findById(req.params.id).populate("user", "email");
+        const order = await Order.findById(req.params.id)
+            .populate("user", "name email first_name last_name");
 
         if (!order) {
             return res.status(404).json({
@@ -288,7 +289,7 @@ exports.cancelOrder = async (req, res, next) => {
         order.cancelledAt = Date.now();
         await order.save();
 
-        // ✅ Send email for status change
+        // Send email for status change
         try {
             const emailHTML = getOrderStatusEmailTemplate(order, previousStatus);
 
@@ -298,9 +299,9 @@ exports.cancelOrder = async (req, res, next) => {
                 html: emailHTML
             });
 
-            console.log(`✅ Cancellation email sent to ${order.user.email}`);
+            console.log(`Cancellation email sent to ${order.user.email}`);
         } catch (emailError) {
-            console.error("❌ Failed to send cancellation email:", emailError);
+            console.error("Failed to send cancellation email:", emailError);
         }
 
         return res.status(200).json({
@@ -310,7 +311,7 @@ exports.cancelOrder = async (req, res, next) => {
         });
 
     } catch (error) {
-        console.error("❌ Cancel order error:", error);
+        console.error("Cancel order error:", error);
         return res.status(500).json({
             success: false,
             message: error.message
@@ -337,9 +338,15 @@ const getOrderStatusEmailTemplate = (order, previousStatus) => {
     const statusColor = statusColors[order.orderStatus] || { bg: '#757575', light: '#f5f5f5' };
     const statusIcon = statusIcons[order.orderStatus] || '📋';
 
-    const customerName = order.user.first_name 
-        ? `${order.user.first_name} ${order.user.last_name || ''}`.trim()
-        : order.user.name || 'Valued Customer';
+    let customerName = 'Valued Customer';
+    
+    if (order.user.first_name) {
+        customerName = order.user.last_name 
+            ? `${order.user.first_name} ${order.user.last_name}`.trim()
+            : order.user.first_name;
+    } else if (order.user.name) {
+        customerName = order.user.name;
+    }
 
     // Generate order items HTML
     const orderItemsHTML = order.orderItems.map(item => `

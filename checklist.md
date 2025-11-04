@@ -15,16 +15,16 @@
 
 # MP3 Review Ratings 20pts
 (Fix the reviews, the user should be allowed multiple reviews and they are also only allowed to leave a review after the order is succesful)
-- [] users who availed of the product/service can write a review and rate the product service 10pts
-- [] users can update their own review rating. 5pts
+- [x] users who availed of the product/service can write a review and rate the product service 10pts
+- [x] users can update their own review rating. 5pts
 - [ ] admin can delete a review 5pts. 
 
 # TERM TEST LAB 30pts
 
 - [x] completed transaction. 10pts
-- [] admin updates the status of the transaction. 5pts 
-- [ ] email the customer of the updated transaction details. the email contains the list of products/services, their subtotal and grand total. 5pts
-- [ ] use FCM push notifications to inform the customer of the updated transaction. store the FCM registration token on the database 10pts
+- [x] admin updates the status of the transaction. 5pts 
+- [x] email the customer of the updated transaction details. the email contains the list of products/services, their subtotal and grand total. 5pts
+- [] use FCM push notifications to inform the customer of the updated transaction. store the FCM registration token on the database 10pts
 
 # UNIT 1
 

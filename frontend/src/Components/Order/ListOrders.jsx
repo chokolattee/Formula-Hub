@@ -44,17 +44,21 @@ import {
     RateReview,
     Close,
     CloudUpload,
-    Delete
+    Delete,
+    RemoveRedEye
 } from '@mui/icons-material'
 
 const ListOrders = () => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [myOrdersList, setMyOrdersList] = useState([])
+    const [myReviews, setMyReviews] = useState([])
     const [activeTab, setActiveTab] = useState(0)
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
     const [orderToCancel, setOrderToCancel] = useState(null)
     const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+    const [viewReviewDialogOpen, setViewReviewDialogOpen] = useState(false)
+    const [selectedReview, setSelectedReview] = useState(null)
     const [reviewData, setReviewData] = useState({
         orderId: '',
         productId: '',
@@ -81,14 +85,37 @@ const ListOrders = () => {
         }
     }
 
+    const fetchMyReviews = async () => {
+        try {
+            const config = {
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                }
+            }
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/reviews/me`, config)
+            setMyReviews(data.data || [])
+        } catch (error) {
+            console.error('Failed to fetch reviews:', error)
+        }
+    }
+
     useEffect(() => {
         myOrders()
+        fetchMyReviews()
         if (error) {
             toast.error(error, {
                 position: 'bottom-right'
             })
         }
     }, [error])
+
+    const hasReviewed = (productId) => {
+        return myReviews.some(review => review.product._id === productId || review.product === productId)
+    }
+
+    const getProductReview = (productId) => {
+        return myReviews.find(review => review.product._id === productId || review.product === productId)
+    }
 
     const handleCancelOrder = async () => {
         try {
@@ -128,25 +155,49 @@ const ListOrders = () => {
         setReviewDialogOpen(true)
     }
 
+    const openViewReviewDialog = (productId) => {
+        const review = getProductReview(productId)
+        if (review) {
+            setSelectedReview(review)
+            setViewReviewDialogOpen(true)
+        }
+    }
+
     const handleImageChange = (e) => {
         const files = Array.from(e.target.files)
-        
-        if (files.length + imagePreview.length > 5) {
+
+        if (files.length + reviewData.images.length > 5) {
             toast.error('Maximum 5 images allowed', {
                 position: 'bottom-right'
             })
             return
         }
 
-        files.forEach(file => {
+        const maxSize = 5 * 1024 * 1024
+        const validFiles = []
+
+        for (const file of files) {
+            if (file.size > maxSize) {
+                toast.error(`${file.name} is too large. Maximum size is 5MB`, {
+                    position: 'bottom-right'
+                })
+                continue
+            }
+            validFiles.push(file)
+        }
+
+        if (validFiles.length === 0) return
+
+        setReviewData(prev => ({
+            ...prev,
+            images: [...prev.images, ...validFiles]
+        }))
+
+        validFiles.forEach(file => {
             const reader = new FileReader()
             reader.onload = () => {
                 if (reader.readyState === 2) {
                     setImagePreview(prev => [...prev, reader.result])
-                    setReviewData(prev => ({
-                        ...prev,
-                        images: [...prev.images, reader.result]
-                    }))
                 }
             }
             reader.readAsDataURL(file)
@@ -180,19 +231,23 @@ const ListOrders = () => {
             const config = {
                 headers: {
                     'Authorization': `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'multipart/form-data'
                 }
             }
 
+            const formData = new FormData()
+            formData.append('orderId', reviewData.orderId)
+            formData.append('product', reviewData.productId)
+            formData.append('rating', reviewData.rating)
+            formData.append('comment', reviewData.comment)
+
+            reviewData.images.forEach((file, index) => {
+                formData.append('images', file)
+            })
+
             await axios.post(
                 `${import.meta.env.VITE_API}/review`,
-                {
-                    orderId: reviewData.orderId,
-                    productId: reviewData.productId,
-                    rating: reviewData.rating,
-                    comment: reviewData.comment,
-                    images: reviewData.images
-                },
+                formData,
                 config
             )
 
@@ -200,7 +255,7 @@ const ListOrders = () => {
                 position: 'bottom-right'
             })
             setReviewDialogOpen(false)
-            myOrders()
+            fetchMyReviews()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to submit review', {
                 position: 'bottom-right'
@@ -217,7 +272,7 @@ const ListOrders = () => {
     }
 
     const getStatusColor = (status) => {
-        switch(status) {
+        switch (status) {
             case 'Delivered':
                 return 'success'
             case 'Processing':
@@ -236,7 +291,7 @@ const ListOrders = () => {
     }
 
     const getFilteredOrders = () => {
-        switch(activeTab) {
+        switch (activeTab) {
             case 0:
                 return myOrdersList
             case 1:
@@ -254,7 +309,7 @@ const ListOrders = () => {
 
     const renderOrderCard = (order) => {
         const getBorderColor = (status) => {
-            switch(status) {
+            switch (status) {
                 case 'Processing': return '#ffc107'
                 case 'Shipped': return '#17a2b8'
                 case 'Delivered': return '#28a745'
@@ -438,20 +493,41 @@ const ListOrders = () => {
                                         ₱{(item.quantity * item.price).toFixed(2)}
                                     </Typography>
                                     {order.orderStatus === 'Delivered' && (
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            startIcon={<RateReview />}
-                                            onClick={() => openReviewDialog(order._id, item.product, item.name)}
-                                            sx={{
-                                                bgcolor: '#28a745',
-                                                '&:hover': { bgcolor: '#218838' },
-                                                fontSize: '12px',
-                                                py: 0.5
-                                            }}
-                                        >
-                                            Review
-                                        </Button>
+                                        hasReviewed(item.product) ? (
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<RemoveRedEye />}
+                                                onClick={() => openViewReviewDialog(item.product)}
+                                                sx={{
+                                                    color: '#17a2b8',
+                                                    borderColor: '#17a2b8',
+                                                    '&:hover': { 
+                                                        bgcolor: '#17a2b8',
+                                                        color: '#fff'
+                                                    },
+                                                    fontSize: '12px',
+                                                    py: 0.5
+                                                }}
+                                            >
+                                                View Review
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                startIcon={<RateReview />}
+                                                onClick={() => openReviewDialog(order._id, item.product, item.name)}
+                                                sx={{
+                                                    bgcolor: '#28a745',
+                                                    '&:hover': { bgcolor: '#218838' },
+                                                    fontSize: '12px',
+                                                    py: 0.5
+                                                }}
+                                            >
+                                                Review
+                                            </Button>
+                                        )
                                     )}
                                 </Box>
                             </Paper>
@@ -478,14 +554,33 @@ const ListOrders = () => {
     return (
         <>
             <MetaData title={'My Orders'} />
-            
+
             <Container maxWidth="xl" sx={{ mt: { xs: 12, md: 15 }, mb: 6, px: { xs: 2, sm: 3, md: 4 } }}>
                 <Box mb={5}>
-                    <Box display="flex" alignItems="center" mb={2}>
-                        <ShoppingBag sx={{ fontSize: 40, color: '#dc3545', mr: 2 }} />
-                        <Typography variant="h4" sx={{ color: '#fff', fontWeight: 600 }}>
-                            My Orders
-                        </Typography>
+                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                        <Box display="flex" alignItems="center">
+                            <ShoppingBag sx={{ fontSize: 40, color: '#dc3545', mr: 2 }} />
+                            <Typography variant="h4" sx={{ color: '#fff', fontWeight: 600 }}>
+                                My Orders
+                            </Typography>
+                        </Box>
+                        <Button
+                            component={Link}
+                            to="/reviews/me"
+                            variant="outlined"
+                            startIcon={<RateReview />}
+                            sx={{
+                                color: '#fff',
+                                borderColor: '#444',
+                                fontWeight: 600,
+                                '&:hover': {
+                                    bgcolor: '#28a745',
+                                    borderColor: '#28a745'
+                                }
+                            }}
+                        >
+                            My Reviews
+                        </Button>
                     </Box>
                 </Box>
 
@@ -515,16 +610,16 @@ const ListOrders = () => {
                                     label={
                                         <Box display="flex" alignItems="center" gap={1}>
                                             All Orders
-                                            <Chip 
-                                                label={myOrdersList.length} 
+                                            <Chip
+                                                label={myOrdersList.length}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: activeTab === 0 ? '#dc3545' : '#333',
                                                     color: '#fff',
                                                     fontWeight: 700,
                                                     height: 20,
                                                     fontSize: '11px'
-                                                }} 
+                                                }}
                                             />
                                         </Box>
                                     }
@@ -542,16 +637,16 @@ const ListOrders = () => {
                                     label={
                                         <Box display="flex" alignItems="center" gap={1}>
                                             Processing
-                                            <Chip 
-                                                label={processingCount} 
+                                            <Chip
+                                                label={processingCount}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: activeTab === 1 ? '#ffc107' : '#333',
                                                     color: activeTab === 1 ? '#000' : '#fff',
                                                     fontWeight: 700,
                                                     height: 20,
                                                     fontSize: '11px'
-                                                }} 
+                                                }}
                                             />
                                         </Box>
                                     }
@@ -569,16 +664,16 @@ const ListOrders = () => {
                                     label={
                                         <Box display="flex" alignItems="center" gap={1}>
                                             Shipped
-                                            <Chip 
-                                                label={shippedCount} 
+                                            <Chip
+                                                label={shippedCount}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: activeTab === 2 ? '#17a2b8' : '#333',
                                                     color: '#fff',
                                                     fontWeight: 700,
                                                     height: 20,
                                                     fontSize: '11px'
-                                                }} 
+                                                }}
                                             />
                                         </Box>
                                     }
@@ -596,16 +691,16 @@ const ListOrders = () => {
                                     label={
                                         <Box display="flex" alignItems="center" gap={1}>
                                             Delivered
-                                            <Chip 
-                                                label={deliveredCount} 
+                                            <Chip
+                                                label={deliveredCount}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: activeTab === 3 ? '#28a745' : '#333',
                                                     color: '#fff',
                                                     fontWeight: 700,
                                                     height: 20,
                                                     fontSize: '11px'
-                                                }} 
+                                                }}
                                             />
                                         </Box>
                                     }
@@ -623,16 +718,16 @@ const ListOrders = () => {
                                     label={
                                         <Box display="flex" alignItems="center" gap={1}>
                                             Cancelled
-                                            <Chip 
-                                                label={cancelledCount} 
+                                            <Chip
+                                                label={cancelledCount}
                                                 size="small"
-                                                sx={{ 
+                                                sx={{
                                                     bgcolor: activeTab === 4 ? '#dc3545' : '#333',
                                                     color: '#fff',
                                                     fontWeight: 700,
                                                     height: 20,
                                                     fontSize: '11px'
-                                                }} 
+                                                }}
                                             />
                                         </Box>
                                     }
@@ -804,21 +899,27 @@ const ListOrders = () => {
                             variant="outlined"
                             component="label"
                             startIcon={<CloudUpload />}
+                            disabled={reviewData.images.length >= 5}
                             sx={{
                                 color: '#fff',
                                 borderColor: '#444',
                                 '&:hover': {
                                     borderColor: '#666'
+                                },
+                                '&.Mui-disabled': {
+                                    color: '#666',
+                                    borderColor: '#333'
                                 }
                             }}
                         >
-                            Upload Images
+                            Upload Images ({reviewData.images.length}/5)
                             <input
                                 type="file"
                                 hidden
-                                accept="image/*"
+                                accept="image/jpeg,image/jpg,image/png"
                                 multiple
                                 onChange={handleImageChange}
+                                disabled={reviewData.images.length >= 5}
                             />
                         </Button>
 
@@ -869,6 +970,106 @@ const ListOrders = () => {
                         }}
                     >
                         Submit Review
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* View Review Dialog */}
+            <Dialog
+                open={viewReviewDialogOpen}
+                onClose={() => setViewReviewDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#1a1a1a',
+                        border: '1px solid #333'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    Your Review
+                    <IconButton onClick={() => setViewReviewDialogOpen(false)} sx={{ color: '#999' }}>
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent>
+                    {selectedReview && (
+                        <>
+                            <Box mb={3}>
+                                <Typography sx={{ color: '#999', mb: 1, fontSize: '14px' }}>
+                                    Product: {selectedReview.product?.name || 'Product'}
+                                </Typography>
+                                <Typography sx={{ color: '#666', fontSize: '12px' }}>
+                                    Reviewed on {formatDate(selectedReview.createdAt)}
+                                </Typography>
+                            </Box>
+
+                            <Box mb={3}>
+                                <Typography sx={{ color: '#fff', mb: 1 }}>Your Rating</Typography>
+                                <Rating
+                                    value={selectedReview.rating}
+                                    readOnly
+                                    size="large"
+                                    sx={{
+                                        '& .MuiRating-iconFilled': {
+                                            color: '#ffc107'
+                                        }
+                                    }}
+                                />
+                            </Box>
+
+                            <Box mb={3}>
+                                <Typography sx={{ color: '#fff', mb: 1 }}>Your Review</Typography>
+                                <Paper
+                                    sx={{
+                                        p: 2,
+                                        bgcolor: '#252525',
+                                        backgroundImage: 'none'
+                                    }}
+                                >
+                                    <Typography sx={{ color: '#fff', whiteSpace: 'pre-wrap' }}>
+                                        {selectedReview.comment}
+                                    </Typography>
+                                </Paper>
+                            </Box>
+
+                            {selectedReview.images && selectedReview.images.length > 0 && (
+                                <Box mb={3}>
+                                    <Typography sx={{ color: '#fff', mb: 2 }}>Photos</Typography>
+                                    <ImageList cols={3} gap={8}>
+                                        {selectedReview.images.map((img, index) => (
+                                            <ImageListItem key={index}>
+                                                <img
+                                                    src={img.url}
+                                                    alt={`Review ${index + 1}`}
+                                                    loading="lazy"
+                                                    style={{ 
+                                                        height: 100, 
+                                                        objectFit: 'cover',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    onClick={() => window.open(img.url, '_blank')}
+                                                />
+                                            </ImageListItem>
+                                        ))}
+                                    </ImageList>
+                                </Box>
+                            )}
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button
+                        onClick={() => setViewReviewDialogOpen(false)}
+                        variant="contained"
+                        sx={{
+                            bgcolor: '#444',
+                            '&:hover': { bgcolor: '#555' }
+                        }}
+                    >
+                        Close
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -30,6 +30,7 @@ import UsersList from './Components/Admin/UsersList';
 import CategoriesList from './Components/Admin/CategoriesList';
 import OrdersList from './Components/Admin/OrdersList';
 import ProcessOrder from './Components/Admin/ProcessOrder';
+import MyReviews from './Components/Review/ListReviews';
 import axios from 'axios';
 
 function App() {
@@ -74,7 +75,7 @@ function App() {
         cartItems: newCartItems
       })
 
-      // Also save to localStorage immediately
+      // Save to localStorage immediately
       localStorage.setItem('cartItems', JSON.stringify(newCartItems))
 
       toast.success('Item Added to Cart', {
@@ -140,6 +141,7 @@ function App() {
           <Route path="/success" element={<OrderSuccess clearCart={clearCart} />} />
           <Route path="/orders/me" element={<ListOrders />} />
           <Route path="/order/:id" element={<OrderDetails />} />
+          <Route path="/reviews/me" element={<MyReviews />} />
           
           {/* Admin Routes */}
           <Route path="/dashboard" element={<Dashboard />} />

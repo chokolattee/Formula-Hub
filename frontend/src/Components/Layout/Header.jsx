@@ -89,6 +89,9 @@ const Header = ({ cartItems }) => {
                                     <Link to="/orders/me" onClick={() => setDropdownOpen(false)}>
                                         <div className="dropdown-item-custom">My Orders</div>
                                     </Link>
+                                    <Link to="/reviews/me" onClick={() => setDropdownOpen(false)}>
+                                        <div className="dropdown-item-custom">My Reviews</div>
+                                    </Link>
                                     <div className="dropdown-divider"></div>
                                     <Link to="/" onClick={() => { logoutHandler(); setDropdownOpen(false); }}>
                                         <div className="dropdown-item-custom logout-item">Logout</div>
