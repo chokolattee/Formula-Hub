@@ -68,6 +68,16 @@ const ProcessOrder = () => {
         position: 'bottom-center'
     })
 
+    // Helper function to get customer name
+    const getCustomerName = (user) => {
+        if (!user) return 'N/A';
+        if (user.name) return user.name;
+        if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
+        if (user.first_name) return user.first_name;
+        if (user.last_name) return user.last_name;
+        return 'N/A';
+    };
+
     const getOrderDetails = async (id) => {
         try {
             const config = {
@@ -230,7 +240,7 @@ const ProcessOrder = () => {
                                                             Name
                                                         </Typography>
                                                         <Typography variant="body1" sx={{ color: '#fff' }}>
-                                                            {user?.name || 'N/A'}
+                                                            {getCustomerName(user)}
                                                         </Typography>
                                                     </Box>
                                                 </Box>

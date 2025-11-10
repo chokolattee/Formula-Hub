@@ -5,7 +5,9 @@ import axios from 'axios'
 import { toast } from 'react-hot-toast'
 import '../../Styles/details.css'
 import { getUser } from '../Utils/helpers';
-
+import ImageGallery from './ImageGallery';
+import '../../Styles/reviews.css';
+import Rating from '@mui/material/Rating';
 
 const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
     const loggedUser = user || getUser();
@@ -16,6 +18,20 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
     const [selectedImage, setSelectedImage] = useState(0)
     const [descriptionOpen, setDescriptionOpen] = useState(true)
     const [detailsOpen, setDetailsOpen] = useState(false)
+    const [galleryImages, setGalleryImages] = useState(null)
+    const [galleryStartIndex, setGalleryStartIndex] = useState(0)
+    const [reviews, setReviews] = useState([])
+    const [loadingReviews, setLoadingReviews] = useState(false)
+    const [ratingCounts, setRatingCounts] = useState({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 })
+
+    const openImageGallery = (images, startIndex) => {
+        setGalleryImages(images);
+        setGalleryStartIndex(startIndex);
+    };
+
+    const closeImageGallery = () => {
+        setGalleryImages(null);
+    };
 
     let { id } = useParams()
     let navigate = useNavigate()
@@ -42,6 +58,31 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
         }
     }
 
+    const fetchReviews = async (productId) => {
+        setLoadingReviews(true)
+        try {
+            const { data } = await axios.get(`http://localhost:8000/api/v1/review?product=${productId}`)
+            console.log('Reviews data:', data)
+            if (data.success && data.data) {
+                setReviews(data.data)
+                
+                // Calculate rating counts
+                const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+                data.data.forEach(review => {
+                    if (review.rating) {
+                        counts[Math.floor(review.rating)]++
+                    }
+                })
+                setRatingCounts(counts)
+            }
+        } catch (err) {
+            console.error('Error fetching reviews:', err)
+            toast.error('Failed to load reviews')
+        } finally {
+            setLoadingReviews(false)
+        }
+    }
+
     const getProductDetails = async (id) => {
         setLoading(true)
         try {
@@ -49,6 +90,7 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
             console.log('Product data:', data)
             setProduct(data.data)
             setError('')
+            await fetchReviews(id);
         } catch (err) {
             console.error('Error fetching product:', err)
             setError('Product not found or server error')
@@ -75,11 +117,9 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
         }
         
         try {
-            // If addItemToCart prop exists, use it
             if (addItemToCart) {
                 await addItemToCart(id, quantity);
             } else {
-                // Fallback: Add to cart locally
                 const cartItem = {
                     product: id, 
                     name: product.name,
@@ -89,26 +129,19 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                     quantity: quantity
                 };
                 
-                // Get existing cart items
                 const existingCart = JSON.parse(localStorage.getItem('cartItems') || '[]');
-                
-                // Check if item already exists
                 const existingItemIndex = existingCart.findIndex(item => item.product === id);
                 
                 if (existingItemIndex > -1) {
-                    // Update quantity
                     existingCart[existingItemIndex].quantity = quantity;
                 } else {
-                    // Add new item
                     existingCart.push(cartItem);
                 }
                 
-                // Save to localStorage
                 localStorage.setItem('cartItems', JSON.stringify(existingCart));
             }
             
             toast.success('Item added to cart');
-            // Navigate to cart page
             navigate('/cart');
         } catch (error) {
             console.error('Error adding to cart:', error);
@@ -243,7 +276,6 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                     </button>
                                 </div>
 
-
                                 {/* Add to Cart Button */}
                                 <button
                                     className="add-to-cart-btn"
@@ -311,17 +343,17 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
 
                                         {/* Rating */}
                                         <div className="rating-container" style={{ marginTop: '15px' }}>
-                                            <div className="rating-outer">
-                                                <div className="rating-stars-empty">
-                                                    ★★★★★
-                                                </div>
-                                                <div
-                                                    className="rating-inner"
-                                                    style={{ width: `${(product.ratings / 5) * 100}%` }}
-                                                >
-                                                    ★★★★★
-                                                </div>
-                                            </div>
+                                            <Rating
+                                                value={product.ratings || 0}
+                                                precision={0.5}
+                                                readOnly
+                                                size="medium"
+                                                sx={{
+                                                    '& .MuiRating-iconFilled': {
+                                                        color: '#dc0000',
+                                                    },
+                                                }}
+                                            />
                                             <span className="review-count">
                                                 ({product.numOfReviews || 0} Reviews)
                                             </span>
@@ -333,57 +365,137 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                     </div>
 
                     {/* Reviews Section - Below */}
-                    {product.reviews && product.reviews.length > 0 && (
-                        <div className="row mt-4">
-                            <div className="col-12">
-                                <div className="reviews-section">
-                                    <h3 className="reviews-title">
-                                        Customer Reviews
-                                    </h3>
-                                    <hr className="divider" />
+                    <div className="row mt-4">
+                        <div className="col-12">
+                            <div className="reviews-section">
+                                <div className="reviews-header">
+                                    <div className="rating-summary">
+                                        <h3 className="reviews-title mb-3">
+                                            Customer Reviews ({reviews.length})
+                                        </h3>
+                                        <div className="average-rating">
+                                            <Rating
+                                                value={product.ratings || 0}
+                                                precision={0.5}
+                                                readOnly
+                                                size="large"
+                                                sx={{
+                                                    '& .MuiRating-iconFilled': {
+                                                        color: '#dc0000',
+                                                    },
+                                                }}
+                                            />
+                                            <span className="rating-value">{product.ratings || 0} out of 5</span>
+                                        </div>
+                                        <div className="rating-bars">
+                                            {Object.entries(ratingCounts).reverse().map(([rating, count]) => (
+                                                <div key={rating} className="rating-bar-item">
+                                                    <div className="rating-label">{rating} star</div>
+                                                    <div className="rating-bar-container">
+                                                        <div 
+                                                            className="rating-bar-fill"
+                                                            style={{
+                                                                width: `${reviews.length > 0 ? (count / reviews.length) * 100 : 0}%`
+                                                            }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="rating-count">{count}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr className="divider" />
 
+                                {loadingReviews ? (
+                                    <div className="loading-container">
+                                        <div className="spinner"></div>
+                                    </div>
+                                ) : reviews.length === 0 ? (
+                                    <div className="no-reviews">
+                                        No reviews yet. Be the first to review this product!
+                                    </div>
+                                ) : (
                                     <div className="reviews-list">
-                                        {product.reviews.map((review, index) => (
+                                        {reviews.map((review, index) => (
                                             <div key={review?._id || `review-${index}`} className="review-card">
                                                 <div className="row">
-                                                    <div className="col-md-1 col-2">
+                                                    <div className="col-md-2 col-3">
                                                         <img
-                                                            src={review?.avatar || '/images/default_avatar.jpg'}
-                                                            alt="User"
+                                                            src={review?.user?.avatar || '/images/default_avatar.jpg'}
+                                                            alt={review?.user?.name}
                                                             className="review-avatar"
+                                                            loading="lazy"
                                                         />
                                                     </div>
-                                                    <div className="col-md-11 col-10">
-                                                        <div className="review-rating">
-                                                            <div className="rating-outer">
-                                                                <div className="rating-stars-empty">
-                                                                    ★★★★★
-                                                                </div>
-                                                                <div
-                                                                    className="rating-inner"
-                                                                    style={{ width: `${((review?.rating || 0) / 5) * 100}%` }}
-                                                                >
-                                                                    ★★★★★
-                                                                </div>
+                                                    <div className="col-md-10 col-9">
+                                                        <div className="review-header">
+                                                            <div className="review-author">
+                                                                <h5 className="reviewer-name">
+                                                                    {review?.user?.name || 'Anonymous'}
+                                                                </h5>
+                                                                <small className="review-date">
+                                                                    {new Date(review?.createdAt).toLocaleDateString()}
+                                                                </small>
                                                             </div>
+                                                            <Rating
+                                                                value={review?.rating || 0}
+                                                                precision={0.5}
+                                                                readOnly
+                                                                size="small"
+                                                                sx={{
+                                                                    '& .MuiRating-iconFilled': {
+                                                                        color: '#dc0000',
+                                                                    },
+                                                                }}
+                                                            />
                                                         </div>
-                                                        <p className="review-author">
-                                                            {review?.name || 'Anonymous'}
-                                                        </p>
-                                                        <p className="review-comment">
-                                                            {review?.comment || 'No comment provided'}
-                                                        </p>
+                                                        <div className="review-content">
+                                                            <p className="review-comment">
+                                                                {review?.comment || 'No comment provided'}
+                                                            </p>
+                                                            {review?.images && review.images.length > 0 && (
+                                                                <div className="review-images-carousel">
+                                                                    <div className="review-images-grid">
+                                                                        {review.images.map((image, imgIndex) => (
+                                                                            <img
+                                                                                key={`review-img-${imgIndex}`}
+                                                                                src={image.url}
+                                                                                alt={`Review ${imgIndex + 1}`}
+                                                                                className="review-image"
+                                                                                loading="lazy"
+                                                                                onClick={() => openImageGallery(review.images, imgIndex)}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {review?.order && (
+                                                            <div className="review-order-info">
+                                                                <small>
+                                                                    Order #{review.order.orderNumber} • {review.order.orderStatus}
+                                                                </small>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
+            {galleryImages && (
+                <ImageGallery
+                    images={galleryImages}
+                    startIndex={galleryStartIndex}
+                    onClose={closeImageGallery}
+                />
+            )}
         </>
     )
 }

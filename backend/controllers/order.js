@@ -1,6 +1,9 @@
 const Order = require('../models/order');
 const Product = require('../models/product');
 const sendEmail = require('../utils/sendEmail');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 exports.newOrder = async (req, res, next) => {
     try {
@@ -14,7 +17,6 @@ exports.newOrder = async (req, res, next) => {
             paymentInfo
         } = req.body;
 
-        // Validate stock availability for all items before creating order
         for (const item of orderItems) {
             const product = await Product.findById(item.product);
             
@@ -33,7 +35,6 @@ exports.newOrder = async (req, res, next) => {
             }
         }
 
-        // Create the order
         const order = await Order.create({
             orderItems,
             shippingInfo,
@@ -46,23 +47,53 @@ exports.newOrder = async (req, res, next) => {
             user: req.user._id
         });
 
-        // Update stock for each item after order is created
         for (const item of orderItems) {
             await updateStock(item.product, item.quantity);
         }
 
         await order.populate('user', 'name email first_name last_name');
 
-        // Send order confirmation email
+        // Send order confirmation email 
+        let pdfPath = null;
         try {
+            pdfPath = await generatePDFReceipt(order);
+            console.log(`PDF ready for email attachment: ${pdfPath}`);
+
+            if (!fs.existsSync(pdfPath)) {
+                throw new Error('PDF file was not created successfully');
+            }
+
             const emailHTML = getOrderStatusEmailTemplate(order, null);
+            
             await sendEmail({
                 email: order.user.email,
                 subject: `Order Confirmation - Order #${order._id}`,
-                html: emailHTML
+                html: emailHTML,
+                attachments: [{
+                    filename: `receipt-${order._id.toString().slice(-8).toUpperCase()}.pdf`,
+                    path: pdfPath,
+                    contentType: 'application/pdf'
+                }]
             });
+
+            console.log(`Order confirmation email with PDF sent to ${order.user.email}`);
+
         } catch (emailError) {
             console.error('Failed to send order confirmation email:', emailError);
+            console.error('Email error details:', {
+                message: emailError.message,
+                stack: emailError.stack,
+                pdfPath: pdfPath
+            });
+        } finally {
+            if (pdfPath && fs.existsSync(pdfPath)) {
+                try {
+                    fs.unlinkSync(pdfPath);
+                    console.log(`Cleaned up PDF file: ${pdfPath}`);
+                } catch (cleanupError) {
+                    console.error('Failed to clean up PDF:', cleanupError);
+                }
+            }
         }
 
         res.status(200).json({
@@ -187,7 +218,6 @@ exports.updateOrder = async (req, res, next) => {
             });
         }
 
-        // Prevent updating if order is already delivered
         if (order.orderStatus === 'Delivered') {
             return res.status(400).json({
                 success: false,
@@ -195,7 +225,6 @@ exports.updateOrder = async (req, res, next) => {
             });
         }
 
-        // Prevent updating if order is already cancelled
         if (order.orderStatus === 'Cancelled') {
             return res.status(400).json({
                 success: false,
@@ -203,11 +232,9 @@ exports.updateOrder = async (req, res, next) => {
             });
         }
 
-        // Store previous status for email
         const previousStatus = order.orderStatus;
         const newStatus = req.body.status;
 
-        // If order is being cancelled, restore stock
         if (newStatus === 'Cancelled' && previousStatus !== 'Cancelled') {
             for (const item of order.orderItems) {
                 await restoreStock(item.product, item.quantity);
@@ -215,32 +242,53 @@ exports.updateOrder = async (req, res, next) => {
             console.log(`Stock restored for cancelled order ${order._id}`);
         }
 
-        // Update order status
         order.orderStatus = newStatus;
-        
-        if (newStatus === 'Delivered') {
-            order.deliveredAt = Date.now();
-        }
-
-        if (newStatus === 'Cancelled') {
-            order.cancelledAt = Date.now();
-        }
+        order.updatedAt = Date.now(); 
 
         await order.save();
 
-        // Send status update email to customer
+        // Send status update email w
+        let pdfPath = null;
         try {
+            pdfPath = await generatePDFReceipt(order);
+            console.log(`PDF ready for email attachment: ${pdfPath}`);
+
+            if (!fs.existsSync(pdfPath)) {
+                throw new Error('PDF file was not created successfully');
+            }
+
             const emailHTML = getOrderStatusEmailTemplate(order, previousStatus);
             
+            // Send email with attachment
             await sendEmail({
                 email: order.user.email,
-                subject: `Order Status Update - Order #${order._id.toString().slice(-8).toUpperCase()}`,
-                html: emailHTML
+                subject: `Order Status Update - Order #${order._id}`,
+                html: emailHTML,
+                attachments: [{
+                    filename: `receipt-${order._id}.pdf`,
+                    path: pdfPath,
+                    contentType: 'application/pdf'
+                }]
             });
 
-            console.log(`Status update email sent to ${order.user.email} for order ${order._id}`);
+            console.log(`Status update email with PDF sent to ${order.user.email} for order ${order._id}`);
+
         } catch (emailError) {
             console.error('Failed to send status update email:', emailError);
+            console.error('Email error details:', {
+                message: emailError.message,
+                stack: emailError.stack,
+                pdfPath: pdfPath
+            });
+        } finally {
+            if (pdfPath && fs.existsSync(pdfPath)) {
+                try {
+                    fs.unlinkSync(pdfPath);
+                    console.log(`Cleaned up PDF file: ${pdfPath}`);
+                } catch (cleanupError) {
+                    console.error('Failed to clean up PDF:', cleanupError);
+                }
+            }
         }
 
         res.status(200).json({
@@ -276,32 +324,56 @@ exports.cancelOrder = async (req, res, next) => {
             });
         }
 
-        // Save old status before change
         const previousStatus = order.orderStatus;
 
-        // Restore inventory
         for (const item of order.orderItems) {
             await restoreStock(item.product, item.quantity);
         }
 
-        // Update status
         order.orderStatus = "Cancelled";
-        order.cancelledAt = Date.now();
+        order.updatedAt = Date.now(); 
         await order.save();
 
-        // Send email for status change
+        let pdfPath = null;
         try {
+            pdfPath = await generatePDFReceipt(order);
+            console.log(`PDF ready for email attachment: ${pdfPath}`);
+
+            if (!fs.existsSync(pdfPath)) {
+                throw new Error('PDF file was not created successfully');
+            }
+
             const emailHTML = getOrderStatusEmailTemplate(order, previousStatus);
 
             await sendEmail({
                 email: order.user.email,
-                subject: `Order Cancelled - #${order._id.toString().slice(-8).toUpperCase()}`,
-                html: emailHTML
+                subject: `Order Cancelled - #${order._id}`,
+                html: emailHTML,
+                attachments: [{
+                    filename: `receipt-${order._id}.pdf`,
+                    path: pdfPath,
+                    contentType: 'application/pdf'
+                }]
             });
 
-            console.log(`Cancellation email sent to ${order.user.email}`);
+            console.log(`Cancellation email with PDF sent to ${order.user.email}`);
+
         } catch (emailError) {
             console.error("Failed to send cancellation email:", emailError);
+            console.error('Email error details:', {
+                message: emailError.message,
+                stack: emailError.stack,
+                pdfPath: pdfPath
+            });
+        } finally {
+            if (pdfPath && fs.existsSync(pdfPath)) {
+                try {
+                    fs.unlinkSync(pdfPath);
+                    console.log(`Cleaned up PDF file: ${pdfPath}`);
+                } catch (cleanupError) {
+                    console.error('Failed to clean up PDF:', cleanupError);
+                }
+            }
         }
 
         return res.status(200).json({
@@ -319,6 +391,158 @@ exports.cancelOrder = async (req, res, next) => {
     }
 };
 
+async function generatePDFReceipt(order) {
+    return new Promise((resolve, reject) => {
+        try {
+            const tempDir = path.join(__dirname, '..', 'temp');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            const pdfPath = path.join(tempDir, `receipt-${order._id}.pdf`);
+            const doc = new PDFDocument({ margin: 50 });
+            const stream = fs.createWriteStream(pdfPath);
+
+            doc.pipe(stream);
+
+            // Get customer name
+            let customerName = 'Valued Customer';
+            if (order.user.first_name) {
+                customerName = order.user.last_name 
+                    ? `${order.user.first_name} ${order.user.last_name}`.trim()
+                    : order.user.first_name;
+            } else if (order.user.name) {
+                customerName = order.user.name;
+            }
+
+            // Header
+            doc.fontSize(24).fillColor('#d32f2f').text('FormulaHub', { align: 'center' });
+            doc.moveDown(0.5);
+            doc.fontSize(18).fillColor('#000').text('Order Receipt', { align: 'center' });
+            doc.moveDown(0.5);
+            doc.fontSize(10).fillColor('#666').text(`Order #${order._id.toString().slice(-8).toUpperCase()}`, { align: 'center' });
+            doc.moveDown(2);
+
+            // Order Status Badge
+            const statusColors = {
+                'Processing': '#ff9800',
+                'Shipped': '#2196f3',
+                'Delivered': '#4caf50',
+                'Cancelled': '#f44336'
+            };
+            const statusColor = statusColors[order.orderStatus] || '#757575';
+            
+            doc.fontSize(12).fillColor(statusColor).text(`Status: ${order.orderStatus}`, { align: 'center' });
+            doc.moveDown(2);
+
+            // Order Information
+            doc.fontSize(14).fillColor('#000').text('Order Information', { underline: true });
+            doc.moveDown(0.5);
+            doc.fontSize(10).fillColor('#333');
+            doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
+            doc.text(`Payment Status: ${order.paymentInfo?.status === 'succeeded' ? 'PAID' : 'NOT PAID'}`);
+            doc.text('Updated At: ' + (order.updateAt ? new Date(order.updateAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'));
+            doc.moveDown(1.5);
+
+            // Shipping Information
+            doc.fontSize(14).fillColor('#000').text('Shipping Address', { underline: true });
+            doc.moveDown(0.5);
+            doc.fontSize(10).fillColor('#333');
+            doc.text(customerName);
+            doc.text(order.shippingInfo.address);
+            doc.text(`${order.shippingInfo.city}, ${order.shippingInfo.postalCode}`);
+            doc.text(order.shippingInfo.country);
+            doc.text(`Phone: ${order.shippingInfo.phoneNo}`);
+            doc.moveDown(2);
+
+            // Order Items Table
+            doc.fontSize(14).fillColor('#000').text('Order Items', { underline: true });
+            doc.moveDown(0.5);
+
+            // Table Header
+            const tableTop = doc.y;
+            doc.fontSize(10).fillColor('#666');
+            doc.text('Product', 50, tableTop, { width: 250 });
+            doc.text('Qty', 300, tableTop, { width: 50, align: 'center' });
+            doc.text('Price', 350, tableTop, { width: 90, align: 'right' });
+            doc.text('Subtotal', 440, tableTop, { width: 100, align: 'right' });
+
+            // Draw line under header
+            doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke('#ddd');
+
+            let yPosition = tableTop + 25;
+
+            // Table Items
+            doc.fontSize(9).fillColor('#333');
+            order.orderItems.forEach((item, index) => {
+                doc.text(item.name, 50, yPosition, { width: 250 });
+                doc.text(item.quantity.toString(), 300, yPosition, { width: 50, align: 'center' });
+                doc.text(`PHP ${item.price.toFixed(2)}`, 350, yPosition, { width: 90, align: 'right' });
+                doc.text(`PHP ${(item.price * item.quantity).toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+                
+                yPosition += 25;
+                
+                // Add new page if needed
+                if (yPosition > 700) {
+                    doc.addPage();
+                    yPosition = 50;
+                }
+            });
+
+            // Draw line before totals
+            doc.moveTo(50, yPosition).lineTo(540, yPosition).stroke('#ddd');
+            yPosition += 15;
+
+            // Totals
+            doc.fontSize(10).fillColor('#333');
+            doc.text('Items Subtotal:', 350, yPosition, { width: 90, align: 'right' });
+            doc.text(`PHP ${order.itemsPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            yPosition += 20;
+
+            doc.text('Tax:', 350, yPosition, { width: 90, align: 'right' });
+            doc.text(`PHP ${order.taxPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            yPosition += 20;
+
+            doc.text('Shipping:', 350, yPosition, { width: 90, align: 'right' });
+            doc.text(`PHP ${order.shippingPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            yPosition += 20;
+
+            // Draw line before grand total
+            doc.moveTo(350, yPosition).lineTo(540, yPosition).stroke('#d32f2f');
+            yPosition += 15;
+
+            // Grand Total
+            doc.fontSize(12).fillColor('#000').font('Helvetica-Bold');
+            doc.text('Grand Total:', 350, yPosition, { width: 90, align: 'right' });
+            doc.fillColor('#d32f2f').text(`₱${order.totalPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+
+            // Footer
+            doc.fontSize(8).fillColor('#999').font('Helvetica');
+            doc.text(
+                `© ${new Date().getFullYear()} FormulaHub. All rights reserved.\nQuestions? Contact us at formulahub@support.com`,
+                50,
+                750,
+                { align: 'center', width: 500 }
+            );
+
+            doc.end();
+
+            stream.on('finish', () => {
+                console.log(`PDF generated successfully at: ${pdfPath}`);
+                resolve(pdfPath);
+            });
+
+            stream.on('error', (error) => {
+                console.error('Stream error:', error);
+                reject(error);
+            });
+
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            reject(error);
+        }
+    });
+}
 
 const getOrderStatusEmailTemplate = (order, previousStatus) => {
     const statusColors = {
@@ -442,6 +666,15 @@ const getOrderStatusEmailTemplate = (order, previousStatus) => {
             </div>
 
             ${statusMessage}
+
+            <!-- PDF Attachment Notice -->
+            <div style="padding: 0 30px 20px 30px;">
+                <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 8px;">
+                    <p style="margin: 0; color: #1565c0; font-size: 14px;">
+                        📎 <strong>Receipt Attached:</strong> Your order receipt is attached as a PDF file to this email.
+                    </p>
+                </div>
+            </div>
 
             <!-- Order Details Card -->
             <div style="padding: 0 30px 30px 30px;">

@@ -1,4 +1,5 @@
 const Review = require('../models/review');
+const Product = require('../models/product');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary');
 const filterBadWords = require('../utils/wordFilter');
@@ -26,6 +27,74 @@ exports.getMyReviews = async (req, res) => {
     }
 };
 
+// Get product reviews by product ID
+exports.getProductReviews = async (req, res) => {
+    try {
+        const { id } = req.query;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Product ID is required'
+            });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid product ID format'
+            });
+        }
+
+        const reviews = await Review.find({ product: id })
+            .populate('user', 'name first_name last_name avatar email')
+            .populate('product', 'name images price')
+            .populate('order', 'orderNumber createdAt orderStatus')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Calculate average rating for this product
+        let averageRating = null;
+        if (reviews.length > 0) {
+            const stats = await Review.aggregate([
+                { 
+                    $match: { 
+                        product: new mongoose.Types.ObjectId(id)
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        avgRating: { $avg: '$rating' },
+                        totalReviews: { $sum: 1 }
+                    }
+                }
+            ]);
+            
+            if (stats.length > 0) {
+                averageRating = {
+                    average: Number(stats[0].avgRating.toFixed(1)),
+                    total: stats[0].totalReviews
+                };
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Product reviews retrieved successfully.',
+            reviews: reviews,
+            averageRating
+        });
+    } catch (error) {
+        console.error('Error fetching product reviews:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server Error: Unable to fetch product reviews.',
+            error: error.message
+        });
+    }
+};
+
 exports.getReviews = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -35,7 +104,14 @@ exports.getReviews = async (req, res) => {
         const filter = {};
         
         if (req.query.product) {
-            filter.product = req.query.product;
+            if (mongoose.Types.ObjectId.isValid(req.query.product)) {
+                filter.product = new mongoose.Types.ObjectId(req.query.product);
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid product ID format'
+                });
+            }
         }
 
         if (req.query.user) {
@@ -52,17 +128,24 @@ exports.getReviews = async (req, res) => {
 
         const total = await Review.countDocuments(filter);
         const reviews = await Review.find(filter)
-            .populate('user', 'name email first_name last_name avatar')
+            .populate('user', 'name first_name last_name avatar')
             .populate('product', 'name images price')
-            .populate('order', 'orderNumber createdAt')  
+            .populate('order', 'orderNumber createdAt orderStatus')
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .lean();
 
         let averageRating = null;
         if (req.query.product) {
             const stats = await Review.aggregate([
-                { $match: { product: mongoose.Types.ObjectId(req.query.product), isApproved: true } },
+                { 
+                    $match: { 
+                        product: mongoose.Types.ObjectId.isValid(req.query.product) 
+                            ? new mongoose.Types.ObjectId(req.query.product)
+                            : null
+                    }
+                },
                 {
                     $group: {
                         _id: null,
@@ -115,7 +198,8 @@ exports.getOneReview = async (req, res) => {
 
         const review = await Review.findById(id)
             .populate('user', 'name email first_name last_name avatar')
-            .populate('product', 'name images price');
+            .populate('product', 'name images price')
+            .populate('order', 'orderNumber createdAt orderStatus');
 
         if (!review) {
             return res.status(404).json({
@@ -277,6 +361,15 @@ exports.createReview = async (req, res) => {
 
         const newReview = await Review.create(reviewData);
 
+        // Update product's average rating
+        const allReviews = await Review.find({ product: product });
+        const totalRating = allReviews.reduce((acc, review) => acc + review.rating, 0);
+        const averageRating = totalRating / allReviews.length;
+        await Product.findByIdAndUpdate(product, { 
+            ratings: averageRating.toFixed(1),
+            numOfReviews: allReviews.length
+        });
+
         await newReview.populate('user', 'name email first_name last_name avatar');
         await newReview.populate('product', 'name images price');
         await newReview.populate('order', 'orderStatus');
@@ -412,11 +505,22 @@ exports.updateReview = async (req, res) => {
             updateData.isApproved = false;
         }
 
+        updateData.updatedAt = Date.now();
+
         const updatedReview = await Review.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true,
         }).populate('user', 'name email first_name last_name avatar')
           .populate('product', 'name images price');
+
+        // Update product's average rating
+        const allReviews = await Review.find({ product: review.product });
+        const totalRating = allReviews.reduce((acc, rev) => acc + rev.rating, 0);
+        const averageRating = totalRating / allReviews.length;
+        await Product.findByIdAndUpdate(review.product, { 
+            ratings: averageRating.toFixed(1),
+            numOfReviews: allReviews.length
+        });
 
         console.log('Review updated successfully:', updatedReview._id);
 
@@ -436,7 +540,7 @@ exports.updateReview = async (req, res) => {
     }
 };
 
-exports.deleteReview = async (req, res) => {
+exports.deleteMyReview = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -475,6 +579,96 @@ exports.deleteReview = async (req, res) => {
 
         // Delete review from database
         await review.deleteOne();
+
+        // Update product's average rating
+        const allReviews = await Review.find({ product: review.product });
+        const totalRating = allReviews.reduce((acc, rev) => acc + rev.rating, 0);
+        const averageRating = allReviews.length > 0 ? totalRating / allReviews.length : 0;
+        await Product.findByIdAndUpdate(review.product, { 
+            ratings: averageRating.toFixed(1),
+            numOfReviews: allReviews.length
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Review deleted successfully.',
+        });
+    } catch (error) {
+        console.error('Error deleting review:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server Error: Unable to delete review.',
+            error: error.message
+        });
+    }
+};
+
+// Admin delete review - supports both query param (old) and param (new) formats
+exports.deleteReview = async (req, res) => {
+    try {
+        // Support both formats: ?id=xxx&productId=xxx OR /:id
+        const reviewId = req.params.id || req.query.id;
+        const productId = req.query.productId;
+
+        if (!reviewId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review ID is required',
+            });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid Review ID',
+            });
+        }
+
+        const review = await Review.findById(reviewId);
+        if (!review) {
+            return res.status(404).json({
+                success: false,
+                message: 'Review not found.',
+            });
+        }
+
+        // Only admins can delete reviews
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only administrators can delete reviews.',
+            });
+        }
+
+        // If productId is provided, verify the review belongs to that product
+        if (productId && review.product.toString() !== productId.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review does not belong to the specified product.',
+            });
+        }
+
+        // Delete images from Cloudinary in parallel
+        if (review.images && review.images.length > 0) {
+            const deletePromises = review.images.map(image =>
+                cloudinary.v2.uploader.destroy(image.public_id)
+                    .then(() => console.log('Deleted image from Cloudinary:', image.public_id))
+                    .catch(error => console.error('Error deleting image from Cloudinary:', error))
+            );
+            await Promise.all(deletePromises);
+        }
+
+        // Delete review from database
+        await review.deleteOne();
+
+        // Update product's average rating
+        const allReviews = await Review.find({ product: review.product });
+        const totalRating = allReviews.reduce((acc, rev) => acc + rev.rating, 0);
+        const averageRating = allReviews.length > 0 ? totalRating / allReviews.length : 0;
+        await Product.findByIdAndUpdate(review.product, { 
+            ratings: averageRating.toFixed(1),
+            numOfReviews: allReviews.length
+        });
 
         return res.status(200).json({
             success: true,

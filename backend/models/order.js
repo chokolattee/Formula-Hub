@@ -96,8 +96,10 @@ const orderSchema = mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now
-    }
-
+    },
+    updateAt: {
+        type: Date,
+    },
 })
 
 module.exports = mongoose.model('Order', orderSchema)

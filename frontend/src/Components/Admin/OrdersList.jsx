@@ -130,6 +130,16 @@ const OrdersList = () => {
         return () => window.removeEventListener('resize', handleResize)
     }, [])
 
+    // Helper function to get customer name
+    const getCustomerName = (user) => {
+        if (!user) return 'N/A';
+        if (user.name) return user.name;
+        if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
+        if (user.first_name) return user.first_name;
+        if (user.last_name) return user.last_name;
+        return 'N/A';
+    };
+
     // Filter and search orders
     useEffect(() => {
         let filtered = [...allOrders]
@@ -141,10 +151,11 @@ const OrdersList = () => {
         
         // Apply search
         if (searchTerm) {
-            filtered = filtered.filter(order => 
-                order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                order.user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-            )
+            filtered = filtered.filter(order => {
+                const customerName = getCustomerName(order.user);
+                return order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       customerName.toLowerCase().includes(searchTerm.toLowerCase());
+            });
         }
         
         setFilteredOrders(filtered)
@@ -211,9 +222,9 @@ const OrdersList = () => {
     const exportToCSV = () => {
         const csvData = filteredOrders.map(order => ({
             'Order ID': order._id,
-            'Customer': order.user?.name || 'N/A',
+            'Customer': getCustomerName(order.user),
             'Items': order.orderItems.length,
-            'Amount': `$${order.totalPrice}`,
+            'Amount': `₱${order.totalPrice}`,
             'Status': order.orderStatus,
             'Date': new Date(order.createdAt).toLocaleDateString()
         }))
@@ -243,9 +254,9 @@ const OrdersList = () => {
         
         const tableData = filteredOrders.map(order => [
             order._id.substring(0, 8) + '...',
-            order.user?.name || 'N/A',
+            getCustomerName(order.user),
             order.orderItems.length,
-            `$${order.totalPrice}`,
+            `₱${order.totalPrice}`,
             order.orderStatus,
             new Date(order.createdAt).toLocaleDateString()
         ])
@@ -460,6 +471,15 @@ const OrdersList = () => {
 function OrderRow({ order, handleCheck, isChecked, deleteOrder }) {
     const [open, setOpen] = useState(false)
 
+    const getCustomerName = (user) => {
+        if (!user) return 'N/A';
+        if (user.name) return user.name;
+        if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
+        if (user.first_name) return user.first_name;
+        if (user.last_name) return user.last_name;
+        return 'N/A';
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'Processing': return '#ff9800'
@@ -489,10 +509,10 @@ function OrderRow({ order, handleCheck, isChecked, deleteOrder }) {
                 <TableCell sx={{ minWidth: '200px', fontFamily: 'monospace' }}>
                     {order._id}
                 </TableCell>
-                <TableCell align="right">{order.user?.name || 'N/A'}</TableCell>
+                <TableCell align="right">{getCustomerName(order.user)}</TableCell>
                 <TableCell align="right">{order.orderItems.length}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                    ${order.totalPrice}
+                    ₱{order.totalPrice}
                 </TableCell>
                 <TableCell align="right">
                     <Box
@@ -553,7 +573,7 @@ function OrderRow({ order, handleCheck, isChecked, deleteOrder }) {
                                         <TableRow key={index}>
                                             <TableCell>{item.name}</TableCell>
                                             <TableCell align="right">{item.quantity}</TableCell>
-                                            <TableCell align="right">${item.price}</TableCell>
+                                            <TableCell align="right">₱{item.price}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

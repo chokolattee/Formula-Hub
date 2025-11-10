@@ -363,6 +363,15 @@ exports.getProductDetails = async (request, response) => {
             .populate('team', 'name description')
             .exec();
 
+        // Get reviews and calculate average rating
+        const Review = require('../models/review');
+        const reviews = await Review.find({ product: id });
+        
+        if (reviews.length > 0) {
+            const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+            product.ratings = (totalRating / reviews.length).toFixed(1);
+        }
+
         if (!product) {
             return response.status(404).json({ 
                 success: false, 

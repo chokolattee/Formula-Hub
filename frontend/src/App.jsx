@@ -30,6 +30,7 @@ import UsersList from './Components/Admin/UsersList';
 import CategoriesList from './Components/Admin/CategoriesList';
 import OrdersList from './Components/Admin/OrdersList';
 import ProcessOrder from './Components/Admin/ProcessOrder';
+import ReviewsList from './Components/Admin/ReviewsList';
 import MyReviews from './Components/Review/ListReviews';
 import axios from 'axios';
 
@@ -151,6 +152,7 @@ function App() {
           <Route path="/admin/teams" element={<TeamsList />} />
           <Route path="/admin/users" element={<UsersList />} />
           <Route path="/admin/categories" element={<CategoriesList />} />
+          <Route path="/admin/reviews" element={<ReviewsList />} />
         </Routes>
       </Router>
       <Footer />
