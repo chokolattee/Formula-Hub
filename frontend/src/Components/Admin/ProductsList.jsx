@@ -25,6 +25,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import StarIcon from '@mui/icons-material/Star';
 
 import Checkbox from '@mui/material/Checkbox';
 import Collapse from '@mui/material/Collapse';
@@ -391,9 +392,41 @@ const ProductList = () => {
       const response = await axios.get(`http://localhost:8000/api/v1/product?page=${page}&limit=${limit}`);
       
       if (response.data.success) {
-        setApiData(response.data.data);
-        setTotal(response.data.pagination?.total || response.data.data.length);
-        setTotalPages(response.data.pagination?.pages || Math.ceil(response.data.data.length / limit));
+        const products = response.data.data;
+        
+        // Fetch reviews for each product to calculate accurate ratings
+        const productsWithReviews = await Promise.all(
+          products.map(async (product) => {
+            try {
+              const reviewsResponse = await axios.get(`http://localhost:8000/api/v1/review`);
+              if (reviewsResponse.data.success) {
+                const productReviews = reviewsResponse.data.data.filter(
+                  review => review.product?._id === product._id
+                );
+                
+                // Calculate average rating
+                const totalRating = productReviews.reduce((sum, review) => sum + review.rating, 0);
+                const averageRating = productReviews.length > 0 
+                  ? (totalRating / productReviews.length).toFixed(1) 
+                  : 0;
+                
+                return {
+                  ...product,
+                  ratings: parseFloat(averageRating),
+                  numOfReviews: productReviews.length
+                };
+              }
+              return product;
+            } catch (error) {
+              console.error(`Error fetching reviews for product ${product._id}:`, error);
+              return product;
+            }
+          })
+        );
+        
+        setApiData(productsWithReviews);
+        setTotal(response.data.pagination?.total || productsWithReviews.length);
+        setTotalPages(response.data.pagination?.pages || Math.ceil(productsWithReviews.length / limit));
       } else {
         setError('Failed to fetch products');
       }
@@ -1020,7 +1053,14 @@ function Row(props) {
         <TableCell align="right">{row.category}</TableCell>
         <TableCell align="right">{row.team}</TableCell>
         <TableCell align="right">{row.stock}</TableCell>
-        <TableCell align="right">{row.ratings} ({row.numOfReviews})</TableCell>
+        <TableCell align="right">
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+            <StarIcon sx={{ fontSize: 16, color: '#ffa726' }} />
+            <Typography variant="body2">
+              {row.ratings > 0 ? row.ratings : 'N/A'} ({row.numOfReviews} {row.numOfReviews === 1 ? 'review' : 'reviews'})
+            </Typography>
+          </Box>
+        </TableCell>
       </TableRow>
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: '100%' }} colSpan={9}>
@@ -1032,6 +1072,10 @@ function Row(props) {
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2"><strong>Description:</strong> {row.description}</Typography>
                 <Typography variant="body2"><strong>Created At:</strong> {row.createdAt}</Typography>
+                <Typography variant="body2">
+                  <strong>Rating:</strong> {row.ratings > 0 ? `${row.ratings} / 5.0` : 'No ratings yet'} 
+                  ({row.numOfReviews} {row.numOfReviews === 1 ? 'review' : 'reviews'})
+                </Typography>
               </Box>
               <Typography variant="h6" gutterBottom component="div">
                 Product Images

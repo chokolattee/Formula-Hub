@@ -39,8 +39,8 @@ quiz 1
 ratings filter 5pts
 
 quiz 2
-monthly sales charts. all months on the chart label. line chart 10pts 
-sales charts with date range filter.  line or bar chart 15pts
+- [x] monthly sales charts. all months on the chart label. line chart 10pts 
+- [x] sales charts with date range filter.  line or bar chart 15pts
 
 quiz 3
 - [x] pagination on products list on homepage. 10pts

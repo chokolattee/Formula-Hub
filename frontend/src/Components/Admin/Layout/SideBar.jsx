@@ -71,16 +71,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </div>
 
           <ul className="list-unstyled components">
-            {/* ✅ Dashboard - Only visible on /dashboard route */}
-            {location.pathname === '/dashboard' && (
-              <li className="active">
-                <Link to="/dashboard" onClick={handleLinkClick}>
-                  <i className="fa fa-tachometer"></i> Dashboard
-                </Link>
-              </li>
-            )}
+             {/* Dashboard */}
+            <li className={isActive('/dashboard') ? 'active' : ''}>
+              <Link to="/dashboard" onClick={handleLinkClick}>
+                <i className="fa fa-tachometer"></i> Dashboard
+              </Link>
+            </li>
 
-            {/* ✅ CRUD Management */}
+            {/* CRUD Management */}
             <li className={expandedMenus.crud ? 'active' : ''}>
               <a
                 href="#crudSubmenu"
@@ -118,28 +116,28 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
               </ul>
             </li>
 
-            {/* ✅ Orders */}
+            {/* Orders */}
             <li className={isActive('/admin/orders') ? 'active' : ''}>
               <Link to="/admin/orders" onClick={handleLinkClick}>
                 <i className="fa fa-shopping-basket"></i> Orders
               </Link>
             </li>
 
-            {/* ✅ Users */}
+            {/* Users */}
             <li className={isActive('/admin/users') ? 'active' : ''}>
               <Link to="/admin/users" onClick={handleLinkClick}>
                 <i className="fa fa-users"></i> Users
               </Link>
             </li>
 
-            {/* ✅ Reviews */}
+            {/* Reviews */}
             <li className={isActive('/admin/reviews') ? 'active' : ''}>
               <Link to="/admin/reviews" onClick={handleLinkClick}>
                 <i className="fa fa-star"></i> Reviews
               </Link>
             </li>
 
-            {/* ✅ Logout */}
+            {/* Logout */}
             <li>
               <a
                 href="/"
