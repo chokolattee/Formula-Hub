@@ -17,7 +17,7 @@
     margin-top: 1px;
     height: 90vh;
     width: 100%;
-    max-width: 79vw;
+    max-width: 100%;
     display: flex;
     justify-content: center;
     padding: 20px;
@@ -62,7 +62,8 @@
 
 .sub-container__single-lg {
     border-radius: 10px;
-    height: 80vh;
+    height: calc(100vh - 150px);
+    min-height: 600px;
     width: 100%;
     background: linear-gradient(145deg, var(--f1-dark-grey) 0%, var(--f1-carbon) 100%);
     box-shadow: 
@@ -546,4 +547,21 @@
 
 .MuiTableCell-body {
     background-color: rgba(26, 26, 26, 0.8) !important;
+}
+
+/* Collapsible Table Controls */
+.collapsible-table__controls {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    justify-content: flex-end;
+    border-top: 1px solid rgba(225, 6, 0, 0.2);
+    margin-top: 10px;
+}
+
+.collapsible-control__item {
+    min-width: 100px;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
 }

@@ -28,10 +28,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { CSSTransition } from "react-transition-group";
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import Sidebar from './Layout/SideBar';
 import MetaData from '../Layout/MetaData';
@@ -349,6 +353,62 @@ const Reviews = () => {
         });
     };
 
+    // Export to CSV
+    const exportToCSV = () => {
+        const csvData = filteredReviews.map(review => ({
+            'Review ID': review._id,
+            'Product': review.product?.name || 'N/A',
+            'User': `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim() || 'N/A',
+            'Rating': review.rating,
+            'Comment': review.comment || 'N/A',
+            'Date': new Date(review.createdAt).toLocaleDateString()
+        }));
+
+        const headers = Object.keys(csvData[0]).join(',');
+        const rows = csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','));
+        const csv = [headers, ...rows].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reviews_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        successMsg('Reviews exported to CSV');
+    };
+
+    // Export to PDF
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.text('Reviews Report', 14, 22);
+        
+        doc.setFontSize(11);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+        doc.text(`Total Reviews: ${total}`, 14, 36);
+        
+        const tableData = filteredReviews.map(review => [
+            review._id.substring(0, 8) + '...',
+            review.product?.name?.substring(0, 20) || 'N/A',
+            `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim().substring(0, 20) || 'N/A',
+            review.rating,
+            review.comment?.substring(0, 30) || 'N/A',
+            new Date(review.createdAt).toLocaleDateString()
+        ]);
+        
+        autoTable(doc, {
+            head: [['Review ID', 'Product', 'User', 'Rating', 'Comment', 'Date']],
+            body: tableData,
+            startY: 42,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [198, 40, 40] }
+        });
+        
+        doc.save(`reviews_${new Date().toISOString().split('T')[0]}.pdf`);
+        successMsg('Reviews exported to PDF');
+    };
+
     const getCurrentPageReviews = () => {
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
@@ -358,6 +418,7 @@ const Reviews = () => {
     const currentPageReviews = getCurrentPageReviews();
 
     return (
+        // ... (rest of the code remains the same)
         <>
             <MetaData title={'Product Reviews'} />
 
@@ -416,6 +477,26 @@ const Reviews = () => {
                                                 <MenuItem value="1">1 Star</MenuItem>
                                             </Select>
                                         </FormControl>
+
+                                        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                                            <Button
+                                                variant="outlined"
+                                                startIcon={<DownloadIcon />}
+                                                onClick={exportToCSV}
+                                                size="small"
+                                            >
+                                                CSV
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                startIcon={<PictureAsPdfIcon />}
+                                                onClick={exportToPDF}
+                                                size="small"
+                                                color="error"
+                                            >
+                                                PDF
+                                            </Button>
+                                        </Box>
                                     </Box>
 
                                     <div className="container-body">

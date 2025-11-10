@@ -19,9 +19,12 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 
-import { IconButton, Typography } from '@mui/material';
+import { IconButton, Typography, TextField } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 import Checkbox from '@mui/material/Checkbox';
 import Collapse from '@mui/material/Collapse';
@@ -31,6 +34,8 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Import Sidebar
 import Sidebar from './Layout/SideBar';
@@ -68,6 +73,10 @@ const CategoriesList = () => {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+
+  // Search and Filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredData, setFilteredData] = useState([]);
 
   const onChange = e => {
     const files = Array.from(e.target.files);
@@ -316,8 +325,76 @@ const CategoriesList = () => {
         updatedAt: new Date(category.updatedAt).toLocaleString(),
       }));
       setFlattenData(flattened);
+      setFilteredData(flattened);
     }
   }, [apiData, page, limit]);
+
+  // Search filter
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = flattenData.filter(category => 
+        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        category.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        category.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredData(filtered);
+    } else {
+      setFilteredData(flattenData);
+    }
+  }, [searchTerm, flattenData]);
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const csvData = filteredData.map(category => ({
+      'Category ID': category.id,
+      'Name': category.name,
+      'Description': category.description,
+      'Created': category.createdAt,
+      'Updated': category.updatedAt
+    }));
+
+    const headers = Object.keys(csvData[0]).join(',');
+    const rows = csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','));
+    const csv = [headers, ...rows].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `categories_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    alert('Categories exported to CSV');
+  };
+
+  // Export to PDF
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Categories Report', 14, 22);
+    
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Total Categories: ${filteredData.length}`, 14, 36);
+    
+    const tableData = filteredData.map(category => [
+      category.id.substring(0, 8) + '...',
+      category.name,
+      category.description.substring(0, 40) + '...',
+      new Date(category.createdAt).toLocaleDateString()
+    ]);
+    
+    autoTable(doc, {
+      head: [['Category ID', 'Name', 'Description', 'Created']],
+      body: tableData,
+      startY: 42,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [198, 40, 40] }
+    });
+    
+    doc.save(`categories_${new Date().toISOString().split('T')[0]}.pdf`);
+    alert('Categories exported to PDF');
+  };
 
   const handleCheck = (id, isChecked) => {
     setCheckedId((prevCheckedId) => {
@@ -427,6 +504,40 @@ const CategoriesList = () => {
 
             <div className="main-container__admin">
               <div className="container sub-container__single-lg">
+                {/* Search and Export */}
+                <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', padding: '20px 20px 0 20px' }}>
+                  <TextField
+                    size="small"
+                    placeholder="Search by Name, Description or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ minWidth: 300, flexGrow: 1 }}
+                    InputProps={{
+                      startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                  
+                  <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={exportToCSV}
+                      size="small"
+                    >
+                      CSV
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PictureAsPdfIcon />}
+                      onClick={exportToPDF}
+                      size="small"
+                      color="error"
+                    >
+                      PDF
+                    </Button>
+                  </Box>
+                </Box>
+
                 <div className="container-body">
                   <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
                     <Table aria-label="collapsible table">
@@ -448,9 +559,9 @@ const CategoriesList = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {flattenData ? (
-                          flattenData.length > 0 ? (
-                            flattenData.map((row) => (
+                        {filteredData ? (
+                          filteredData.length > 0 ? (
+                            filteredData.map((row) => (
                               <Row
                                 key={row.id}
                                 row={row}
@@ -464,7 +575,7 @@ const CategoriesList = () => {
                           ) : (
                             <TableRow>
                               <TableCell colSpan={6} align="center">
-                                <Typography>No Data Available</Typography>
+                                <Typography>No categories found</Typography>
                               </TableCell>
                             </TableRow>
                           )

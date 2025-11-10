@@ -33,7 +33,12 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { CSSTransition } from "react-transition-group";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Import Sidebar
 import Sidebar from './Layout/SideBar';
@@ -48,6 +53,7 @@ const Users = () => {
 
     // State management
     const [users, setUsers] = useState([]);
+    const [filteredUsers, setFilteredUsers] = useState([]);
     const [flattenData, setFlattenData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -90,6 +96,11 @@ const Users = () => {
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
+    // Filters and Search
+    const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+
     // Auto-open sidebar on desktop
     useEffect(() => {
         const handleResize = () => {
@@ -105,21 +116,19 @@ const Users = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Fetch users data with pagination
+    // Fetch users data
     useEffect(() => {
         const retrieveUsers = async () => {
             try {
                 setLoading(true);
-                const response = await axios.get(`http://localhost:8000/api/v1/user?page=${page}&limit=${limit}`);
+                const response = await axios.get(`http://localhost:8000/api/v1/user`);
 
                 if (response.data.success) {
                     setUsers(response.data.data);
-                    setTotal(response.data.pagination?.total || response.data.data.length);
-                    setTotalPages(response.data.pagination?.pages || Math.ceil(response.data.data.length / limit));
+                    setFilteredUsers(response.data.data);
                 } else {
                     setUsers(response.data.data);
-                    setTotal(response.data.data.length);
-                    setTotalPages(Math.ceil(response.data.data.length / limit));
+                    setFilteredUsers(response.data.data);
                 }
             } catch (error) {
                 console.error("Error fetching users:", error);
@@ -129,12 +138,46 @@ const Users = () => {
             }
         };
         retrieveUsers();
-    }, [page, limit]);
+    }, []);
+
+    // Filter and search users
+    useEffect(() => {
+        let filtered = [...users];
+        
+        // Apply role filter
+        if (roleFilter !== 'all') {
+            filtered = filtered.filter(user => user.role === roleFilter);
+        }
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(user => user.status === statusFilter);
+        }
+        
+        // Apply search
+        if (searchTerm) {
+            filtered = filtered.filter(user => {
+                const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
+                const email = (user.email || '').toLowerCase();
+                const id = (user._id || '').toLowerCase();
+                const search = searchTerm.toLowerCase();
+                
+                return fullName.includes(search) || 
+                       email.includes(search) || 
+                       id.includes(search);
+            });
+        }
+        
+        setFilteredUsers(filtered);
+        setTotal(filtered.length);
+        setTotalPages(Math.ceil(filtered.length / limit));
+        setPage(1);
+    }, [searchTerm, roleFilter, statusFilter, users, limit]);
 
     // Flatten data for table display
     useEffect(() => {
-        if (users.length > 0) {
-            const flattened = users.map(user => ({
+        if (filteredUsers.length > 0) {
+            const flattened = filteredUsers.map(user => ({
                 id: user._id,
                 first_name: user.first_name || '',
                 last_name: user.last_name || '',
@@ -148,8 +191,75 @@ const Users = () => {
                 updatedAt: new Date(user.updatedAt).toLocaleString(),
             }));
             setFlattenData(flattened);
+        } else {
+            setFlattenData([]);
         }
-    }, [users]);
+    }, [filteredUsers]);
+
+    // Get current page users
+    const getCurrentPageUsers = () => {
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        return flattenData.slice(startIndex, endIndex);
+    };
+
+    // Export to CSV
+    const exportToCSV = () => {
+        const csvData = filteredUsers.map(user => ({
+            'User ID': user._id,
+            'First Name': user.first_name || '',
+            'Last Name': user.last_name || '',
+            'Email': user.email || '',
+            'Role': user.role,
+            'Status': user.status,
+            'Gender': user.gender || 'N/A',
+            'Created': new Date(user.createdAt).toLocaleDateString()
+        }));
+
+        const headers = Object.keys(csvData[0]).join(',');
+        const rows = csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','));
+        const csv = [headers, ...rows].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        alert('Users exported to CSV');
+    };
+
+    // Export to PDF
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.text('Users Report', 14, 22);
+        
+        doc.setFontSize(11);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+        doc.text(`Total Users: ${total}`, 14, 36);
+        
+        const tableData = filteredUsers.map(user => [
+            user._id.substring(0, 8) + '...',
+            `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A',
+            user.email || 'N/A',
+            user.role,
+            user.status,
+            new Date(user.createdAt).toLocaleDateString()
+        ]);
+        
+        autoTable(doc, {
+            head: [['User ID', 'Name', 'Email', 'Role', 'Status', 'Created']],
+            body: tableData,
+            startY: 42,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [198, 40, 40] }
+        });
+        
+        doc.save(`users_${new Date().toISOString().split('T')[0]}.pdf`);
+        alert('Users exported to PDF');
+    };
 
     // Reset form state
     const resetFormState = () => {
@@ -310,7 +420,8 @@ const Users = () => {
     const handleSelectAll = (isChecked) => {
         setSelectAll(isChecked);
         if (isChecked) {
-            const allIds = flattenData.map(row => row.id);
+            const currentPageUsers = getCurrentPageUsers();
+            const allIds = currentPageUsers.map(row => row.id);
             setCheckedId(allIds);
         } else {
             setCheckedId([]);
@@ -319,10 +430,11 @@ const Users = () => {
 
     // Update selectAll state when individual checkboxes change
     useEffect(() => {
-        if (flattenData.length > 0) {
-            setSelectAll(checkedId.length === flattenData.length);
+        const currentPageUsers = getCurrentPageUsers();
+        if (currentPageUsers.length > 0) {
+            setSelectAll(checkedId.length === currentPageUsers.length && currentPageUsers.every(user => checkedId.includes(user.id)));
         }
-    }, [checkedId, flattenData]);
+    }, [checkedId, flattenData, page]);
 
     // Bulk delete
     const bulkDelete = () => {
@@ -357,6 +469,8 @@ const Users = () => {
     if (loading) return <div>Loading users...</div>;
     if (error) return <div>Error: {error}</div>;
 
+    const currentPageUsers = getCurrentPageUsers();
+
     return (
         <>
             <MetaData title={'Users Management'} />
@@ -376,22 +490,81 @@ const Users = () => {
                         <h1 className="my-4">Users Management</h1>
 
                         <div className="main-container__admin">
-                            <div className="container sub-container__single-lg">
-                                <div className="container-body">
-                                    <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
-                                        <Table aria-label="collapsible table">
+                            <div className="container sub-container__single-lg" style={{ display: 'flex', flexDirection: 'column', padding: '20px' }}>
+                                {/* Filters and Search */}
+                                <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', flexShrink: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Search by Name, Email or ID..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        sx={{ minWidth: 300 }}
+                                        InputProps={{
+                                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                        }}
+                                    />
+                                    
+                                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                                        <InputLabel>Role Filter</InputLabel>
+                                        <Select
+                                            value={roleFilter}
+                                            label="Role Filter"
+                                            onChange={(e) => setRoleFilter(e.target.value)}
+                                        >
+                                            <MenuItem value="all">All Roles</MenuItem>
+                                            <MenuItem value="user">User</MenuItem>
+                                            <MenuItem value="admin">Admin</MenuItem>
+                                        </Select>
+                                    </FormControl>
+
+                                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                                        <InputLabel>Status Filter</InputLabel>
+                                        <Select
+                                            value={statusFilter}
+                                            label="Status Filter"
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                        >
+                                            <MenuItem value="all">All Status</MenuItem>
+                                            <MenuItem value="active">Active</MenuItem>
+                                            <MenuItem value="deactivated">Deactivated</MenuItem>
+                                        </Select>
+                                    </FormControl>
+
+                                    <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<DownloadIcon />}
+                                            onClick={exportToCSV}
+                                            size="small"
+                                        >
+                                            CSV
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<PictureAsPdfIcon />}
+                                            onClick={exportToPDF}
+                                            size="small"
+                                            color="error"
+                                        >
+                                            PDF
+                                        </Button>
+                                    </Box>
+                                </Box>
+
+                                <div className="container-body" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+                                    <TableContainer component={Paper} sx={{ height: '100%', overflow: 'auto' }}>
+                                        <Table stickyHeader aria-label="users table">
                                             <TableHead>
                                                 <TableRow>
                                                     <TableCell />
                                                     <TableCell align="center">
                                                         <Checkbox
                                                             checked={selectAll}
-                                                            indeterminate={checkedId.length > 0 && checkedId.length < flattenData.length}
+                                                            indeterminate={checkedId.length > 0 && checkedId.length < currentPageUsers.length}
                                                             onChange={(e) => handleSelectAll(e.target.checked)}
-                                                            inputProps={{ 'aria-label': 'select all users' }}
                                                         />
                                                     </TableCell>
-                                                    <TableCell>ID</TableCell>
+                                                    <TableCell>User ID</TableCell>
                                                     <TableCell align="right">First Name</TableCell>
                                                     <TableCell align="right">Last Name</TableCell>
                                                     <TableCell align="right">Email</TableCell>
@@ -400,8 +573,8 @@ const Users = () => {
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                                {flattenData.length > 0 ? (
-                                                    flattenData.map((row) => (
+                                                {currentPageUsers.length > 0 ? (
+                                                    currentPageUsers.map((row) => (
                                                         <Row
                                                             key={row.id}
                                                             row={row}
@@ -415,7 +588,7 @@ const Users = () => {
                                                 ) : (
                                                     <TableRow>
                                                         <TableCell colSpan={8} align="center">
-                                                            <Typography>No Data Available</Typography>
+                                                            <Typography>No users found</Typography>
                                                         </TableCell>
                                                     </TableRow>
                                                 )}
@@ -424,21 +597,17 @@ const Users = () => {
                                     </TableContainer>
                                 </div>
 
-                                <div className="container-footer" style={{ padding: '16px' }}>
-                                    <Box sx={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 2,
-                                    }}>
+                                <div className="container-footer" style={{ padding: '12px 16px', flexShrink: 0 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                        {/* Action Buttons */}
                                         <Box sx={{
                                             display: 'flex',
                                             justifyContent: 'flex-start',
                                             gap: 2,
                                             borderBottom: '1px solid rgba(224, 224, 224, 1)',
-                                            pb: 2
+                                            pb: 1.5
                                         }}>
                                             <Button
-                                                className='MuiButton-custom___btn'
                                                 variant="contained"
                                                 onClick={loadModalCreate}
                                                 sx={{
@@ -452,25 +621,16 @@ const Users = () => {
                                             </Button>
                                             <Button
                                                 variant="contained"
-                                                className='invert-button'
+                                                color="error"
                                                 onClick={bulkDelete}
                                                 disabled={checkedId.length === 0}
-                                                sx={{
-                                                    backgroundColor: '#212121',
-                                                    color: 'white',
-                                                    '&:hover': {
-                                                        backgroundColor: '#000000',
-                                                    },
-                                                    '&:disabled': {
-                                                        backgroundColor: '#9e9e9e',
-                                                        color: '#e0e0e0',
-                                                    }
-                                                }}
+                                                startIcon={<DeleteIcon />}
                                             >
                                                 Bulk Delete {checkedId.length > 0 ? `(${checkedId.length})` : ''}
                                             </Button>
                                         </Box>
 
+                                        {/* Pagination */}
                                         <Box sx={{
                                             display: 'flex',
                                             justifyContent: 'space-between',
@@ -478,22 +638,11 @@ const Users = () => {
                                             flexWrap: 'wrap',
                                             gap: 2
                                         }}>
-                                            <Box sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 2,
-                                                flex: '1 1 auto'
-                                            }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                 <FormControl size="small" sx={{ minWidth: 120 }}>
                                                     <Select
                                                         value={limit}
                                                         onChange={(e) => setLimit(Number(e.target.value))}
-                                                        sx={{
-                                                            height: '36px',
-                                                            '& .MuiSelect-select': {
-                                                                paddingY: '8px',
-                                                            }
-                                                        }}
                                                     >
                                                         <MenuItem value={5}>5 per page</MenuItem>
                                                         <MenuItem value={10}>10 per page</MenuItem>
@@ -501,50 +650,28 @@ const Users = () => {
                                                         <MenuItem value={50}>50 per page</MenuItem>
                                                     </Select>
                                                 </FormControl>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: '200px' }}>
+                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                                                     Total Users: {total}
                                                 </Typography>
                                             </Box>
 
-                                            <Box sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 1,
-                                                flex: '0 0 auto'
-                                            }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
                                                     disabled={page === 1}
                                                     onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                                                    sx={{
-                                                        minWidth: '32px',
-                                                        height: '32px',
-                                                        px: 1
-                                                    }}
                                                 >
                                                     <NavigateBeforeIcon />
                                                 </Button>
-                                                <Typography
-                                                    variant="body2"
-                                                    sx={{
-                                                        mx: 2,
-                                                        minWidth: '100px',
-                                                        textAlign: 'center'
-                                                    }}
-                                                >
-                                                    Page {page} of {totalPages}
+                                                <Typography variant="body2" sx={{ mx: 2 }}>
+                                                    Page {page} of {totalPages || 1}
                                                 </Typography>
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
-                                                    disabled={page === totalPages}
+                                                    disabled={page === totalPages || totalPages === 0}
                                                     onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                                                    sx={{
-                                                        minWidth: '32px',
-                                                        height: '32px',
-                                                        px: 1
-                                                    }}
                                                 >
                                                     <NavigateNextIcon />
                                                 </Button>
@@ -1144,7 +1271,7 @@ function Row(props) {
                         inputProps={{ 'aria-label': 'controlled' }}
                     />
                 </TableCell>
-                <TableCell component="th" scope="row" sx={{ minWidth: '300px' }}>
+                <TableCell sx={{ minWidth: '200px', fontFamily: 'monospace' }}>
                     {row.id}
                 </TableCell>
                 <TableCell align="right">{row.first_name}</TableCell>
@@ -1156,7 +1283,7 @@ function Row(props) {
                         size="small"
                         sx={{
                             fontWeight: 600,
-                            backgroundColor: row.role === 'admin' ? '#c62828' : '#2e7d32', // red / green
+                            backgroundColor: row.role === 'admin' ? '#c62828' : '#2e7d32',
                             color: 'white'
                         }}
                     />
@@ -1167,86 +1294,83 @@ function Row(props) {
                         size="small"
                         sx={{
                             fontWeight: 600,
-                            backgroundColor: row.status === 'active' ? '#2e7d32' : '#c62828', // green / red
+                            backgroundColor: row.status === 'active' ? '#2e7d32' : '#c62828',
                             color: 'white'
                         }}
                     />
                 </TableCell>
             </TableRow>
             <TableRow>
-                <TableCell style={{ paddingBottom: 0, paddingTop: 0, width: '100%' }} colSpan={8}>
+                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                     <Collapse in={open} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 1 }}>
-                            <Typography variant="h6" gutterBottom component="div" sx={{
-                                color: '#c62828',
-                                fontWeight: 600
-                            }}>
+                        <Box sx={{ margin: 2 }}>
+                            <Typography variant="h6" gutterBottom>
                                 User Details
                             </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                                <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
-                                    <strong style={{ color: '#ffffff' }}>Gender:</strong> {row.gender || 'N/A'}
+                            
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Personal Information
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
-                                    <strong style={{ color: '#ffffff' }}>Birthday:</strong> {row.birthday || 'N/A'}
+                                <Typography variant="body2">
+                                    Gender: {row.gender || 'N/A'}
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
-                                    <strong style={{ color: '#ffffff' }}>Created At:</strong> {row.createdAt}
-                                </Typography>
-                                <Typography variant="body2" sx={{ fontSize: '1rem', color: '#e0e0e0' }}>
-                                    <strong style={{ color: '#ffffff' }}>Updated At:</strong> {row.updatedAt}
+                                <Typography variant="body2">
+                                    Birthday: {row.birthday || 'N/A'}
                                 </Typography>
                             </Box>
+
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Account Information
+                                </Typography>
+                                <Typography variant="body2">
+                                    Created: {row.createdAt}
+                                </Typography>
+                                <Typography variant="body2">
+                                    Updated: {row.updatedAt}
+                                </Typography>
+                            </Box>
+
+                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => loadViewModal(row.id)}
+                                    startIcon={<IoMdEye />}
+                                    size="small"
+                                >
+                                    View Details
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => loadEditModal(row.id)}
+                                    startIcon={<EditIcon />}
+                                    size="small"
+                                    sx={{
+                                        backgroundColor: '#c62828',
+                                        '&:hover': {
+                                            backgroundColor: '#b71c1c',
+                                        }
+                                    }}
+                                >
+                                    Edit
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this user?')) {
+                                            deleteUser(row.id);
+                                        }
+                                    }}
+                                    disabled={row.status === 'active'}
+                                    size="small"
+                                >
+                                    Delete
+                                </Button>
+                            </Box>
                         </Box>
-                        <div className="collapsible-table__controls">
-                            <Button
-                                className='collapsible-control__item delete'
-                                variant="contained"
-                                disabled={row.status === 'active'}
-                                onClick={() => {
-                                    if (window.confirm('Are you sure you want to delete this user?')) {
-                                        deleteUser(row.id);
-                                    }
-                                }}
-                                sx={{
-                                    backgroundColor: '#212121',
-                                    '&:hover': {
-                                        backgroundColor: '#000000',
-                                    },
-                                    '&:disabled': {
-                                        backgroundColor: '#9e9e9e',
-                                    }
-                                }}
-                            >
-                                Delete
-                            </Button>
-                            <Button
-                                className='collapsible-control__item update'
-                                variant="contained"
-                                onClick={() => loadEditModal(row.id)}
-                                sx={{
-                                    backgroundColor: '#c62828',
-                                    '&:hover': {
-                                        backgroundColor: '#b71c1c',
-                                    }
-                                }}
-                            >
-                                Update
-                            </Button>
-                            <Button
-                                className='collapsible-control__item info'
-                                variant="contained"
-                                onClick={() => loadViewModal(row.id)}
-                                sx={{
-                                    backgroundColor: '#424242',
-                                    '&:hover': {
-                                        backgroundColor: '#212121',
-                                    }
-                                }}
-                            >
-                                View Info
-                            </Button>
-                        </div>
                     </Collapse>
                 </TableCell>
             </TableRow>

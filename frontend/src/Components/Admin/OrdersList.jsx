@@ -8,7 +8,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import { getToken } from '../Utils/helpers'
 import axios from 'axios'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
@@ -261,7 +261,7 @@ const OrdersList = () => {
             new Date(order.createdAt).toLocaleDateString()
         ])
         
-        doc.autoTable({
+        autoTable(doc, {
             head: [['Order ID', 'Customer', 'Items', 'Amount', 'Status', 'Date']],
             body: tableData,
             startY: 42,

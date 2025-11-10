@@ -19,9 +19,12 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 
-import { IconButton, Typography } from '@mui/material';
+import { IconButton, Typography, TextField, InputLabel } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 import Checkbox from '@mui/material/Checkbox';
 import Collapse from '@mui/material/Collapse';
@@ -31,6 +34,8 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Import Sidebar
 import Sidebar from './Layout/SideBar';
@@ -74,6 +79,11 @@ const ProductList = () => {
   const [limit, setLimit] = useState(4);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+
+  // Search and Filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [filteredData, setFilteredData] = useState([]);
 
   const onChange = e => {
     const files = Array.from(e.target.files);
@@ -418,8 +428,91 @@ const ProductList = () => {
         createdAt: new Date(product.createdAt).toLocaleString(),
       }));
       setFlattenData(flattened);
+      setFilteredData(flattened);
     }
   }, [apiData]);
+
+  // Search and Category filter
+  useEffect(() => {
+    let filtered = [...flattenData];
+    
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(product => product.categoryId === categoryFilter);
+    }
+    
+    // Apply search
+    if (searchTerm) {
+      filtered = filtered.filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.team.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    setFilteredData(filtered);
+  }, [searchTerm, categoryFilter, flattenData]);
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const csvData = filteredData.map(product => ({
+      'Product ID': product.id,
+      'Name': product.name,
+      'Price': product.price,
+      'Category': product.category,
+      'Team': product.team,
+      'Stock': product.stock,
+      'Ratings': product.ratings,
+      'Reviews': product.numOfReviews,
+      'Created': product.createdAt
+    }));
+
+    const headers = Object.keys(csvData[0]).join(',');
+    const rows = csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','));
+    const csv = [headers, ...rows].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    alert('Products exported to CSV');
+  };
+
+  // Export to PDF
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text('Products Report', 14, 22);
+    
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Total Products: ${filteredData.length}`, 14, 36);
+    
+    const tableData = filteredData.map(product => [
+      product.id.substring(0, 8) + '...',
+      product.name.substring(0, 20),
+      `₱${product.price}`,
+      product.category,
+      product.stock,
+      product.ratings
+    ]);
+    
+    autoTable(doc, {
+      head: [['Product ID', 'Name', 'Price', 'Category', 'Stock', 'Rating']],
+      body: tableData,
+      startY: 42,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [198, 40, 40] }
+    });
+    
+    doc.save(`products_${new Date().toISOString().split('T')[0]}.pdf`);
+    alert('Products exported to PDF');
+  };
 
   const handleCheck = (id, isChecked) => {
     setCheckedId((prevCheckedId) => {
@@ -605,6 +698,54 @@ const ProductList = () => {
 
             <div className="main-container__admin">
               <div className="container sub-container__single-lg">
+                {/* Search, Filter and Export */}
+                <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', padding: '20px 20px 0 20px' }}>
+                  <TextField
+                    size="small"
+                    placeholder="Search by Name, Category, Team or ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    sx={{ minWidth: 300, flexGrow: 1 }}
+                    InputProps={{
+                      startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                  
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Category Filter</InputLabel>
+                    <Select
+                      value={categoryFilter}
+                      label="Category Filter"
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                      <MenuItem value="all">All Categories</MenuItem>
+                      {categories.map(cat => (
+                        <MenuItem key={cat._id} value={cat._id}>{cat.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  
+                  <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={exportToCSV}
+                      size="small"
+                    >
+                      CSV
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PictureAsPdfIcon />}
+                      onClick={exportToPDF}
+                      size="small"
+                      color="error"
+                    >
+                      PDF
+                    </Button>
+                  </Box>
+                </Box>
+
                 <div className="container-body">
                   <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
                     <Table aria-label="collapsible table">
@@ -629,9 +770,9 @@ const ProductList = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {flattenData ? (
-                          flattenData.length > 0 ? (
-                            flattenData.map((row) => (
+                        {filteredData ? (
+                          filteredData.length > 0 ? (
+                            filteredData.map((row) => (
                               <Row
                                 key={row.id}
                                 row={row}
@@ -645,7 +786,7 @@ const ProductList = () => {
                           ) : (
                             <TableRow>
                               <TableCell colSpan={9} align="center">
-                                <Typography>No Data Available</Typography>
+                                <Typography>No products found</Typography>
                               </TableCell>
                             </TableRow>
                           )
