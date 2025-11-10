@@ -9,7 +9,6 @@ const {
     getOrderStatusDistribution,
     getRevenueByCategory,
     getDailySales,
-    getTopCustomers,
     getLowStockProducts,
     getAllDashboardData
 } = require('../controllers/dashboard');
@@ -25,7 +24,6 @@ router.get('/admin/dashboard/categories/distribution', isAuthenticatedUser, auth
 router.get('/admin/dashboard/orders/status', isAuthenticatedUser, authorizeRoles('admin'), getOrderStatusDistribution);
 router.get('/admin/dashboard/revenue/category', isAuthenticatedUser, authorizeRoles('admin'), getRevenueByCategory);
 router.get('/admin/dashboard/sales/daily', isAuthenticatedUser, authorizeRoles('admin'), getDailySales);
-router.get('/admin/dashboard/customers/top', isAuthenticatedUser, authorizeRoles('admin'), getTopCustomers);
 router.get('/admin/dashboard/products/low-stock', isAuthenticatedUser, authorizeRoles('admin'), getLowStockProducts);
 
 module.exports = router;

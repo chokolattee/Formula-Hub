@@ -41,10 +41,28 @@ exports.getProduct = async (request, response) => {
             .limit(limit)
             .exec();
 
+        // Calculate ratings for each product from reviews
+        const Review = require('../models/review');
+        const productsWithRatings = await Promise.all(products.map(async (product) => {
+            const reviews = await Review.find({ product: product._id });
+            
+            let calculatedRating = 0;
+            if (reviews.length > 0) {
+                const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+                calculatedRating = parseFloat((totalRating / reviews.length).toFixed(1));
+            }
+            
+            return {
+                ...product.toObject(),
+                ratings: calculatedRating,
+                numOfReviews: reviews.length
+            };
+        }));
+
         response.status(200).json({
             success: true,
-            message: products.length ? "Products Retrieved." : "No products found.",
-            data: products,
+            message: productsWithRatings.length ? "Products Retrieved." : "No products found.",
+            data: productsWithRatings,
             pagination: {
                 total: totalProducts,
                 page,
@@ -363,15 +381,6 @@ exports.getProductDetails = async (request, response) => {
             .populate('team', 'name description')
             .exec();
 
-        // Get reviews and calculate average rating
-        const Review = require('../models/review');
-        const reviews = await Review.find({ product: id });
-        
-        if (reviews.length > 0) {
-            const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
-            product.ratings = (totalRating / reviews.length).toFixed(1);
-        }
-
         if (!product) {
             return response.status(404).json({ 
                 success: false, 
@@ -379,13 +388,23 @@ exports.getProductDetails = async (request, response) => {
             });
         }
 
+        // Get reviews and calculate average rating
+        const Review = require('../models/review');
+        const reviews = await Review.find({ product: id });
+        
+        let calculatedRating = 0;
+        if (reviews.length > 0) {
+            const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+            calculatedRating = parseFloat((totalRating / reviews.length).toFixed(1));
+        }
+
         const formattedProduct = {
             _id: product._id,
             name: product.name,
             price: product.price,
             description: product.description,
-            ratings: product.ratings || 0,
-            numOfReviews: product.numOfReviews || 0,
+            ratings: calculatedRating,
+            numOfReviews: reviews.length,
             images: product.images || [],
             category: product.category || null,
             team: product.team || null,
@@ -589,14 +608,78 @@ exports.getProductByMultipleFilters = async (request, response) => {
             }
         }
 
-        // Rating filter
-        if (request.query.minRating) {
-            const minRating = parseFloat(request.query.minRating);
-            if (minRating >= 0 && minRating <= 5) {
-                filter.ratings = { $gte: minRating };
-            }
+        // Keyword search
+        if (request.query.keyword) {
+            filter.$or = [
+                { name: { $regex: request.query.keyword, $options: 'i' } },
+                { description: { $regex: request.query.keyword, $options: 'i' } }
+            ];
         }
 
+        // If rating filter is present, we need to fetch ALL matching products first
+        // then filter by rating, then apply pagination
+        const Review = require('../models/review');
+        
+        if (request.query.rating) {
+            const selectedRating = parseFloat(request.query.rating);
+            
+            // Fetch all products matching other filters (no pagination yet)
+            const allProducts = await Product.find(filter)
+                .populate('category')
+                .populate('team')
+                .sort({ createdAt: -1 })
+                .exec();
+
+            // Calculate ratings for all products
+            const allProductsWithRatings = await Promise.all(allProducts.map(async (product) => {
+                const reviews = await Review.find({ product: product._id });
+                
+                let calculatedRating = 0;
+                if (reviews.length > 0) {
+                    const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+                    calculatedRating = parseFloat((totalRating / reviews.length).toFixed(1));
+                }
+                
+                return {
+                    ...product.toObject(),
+                    ratings: calculatedRating,
+                    numOfReviews: reviews.length
+                };
+            }));
+
+            // Filter by specific star rating (e.g., 4 stars = products with rating 4.0-4.9)
+            const ratingFilteredProducts = allProductsWithRatings.filter(p => {
+                const productRating = p.ratings;
+                // Round down to get the star level (e.g., 4.7 -> 4 stars)
+                const starLevel = Math.floor(productRating);
+                return starLevel === selectedRating;
+            });
+            
+            // Apply pagination to filtered results
+            const paginatedProducts = ratingFilteredProducts.slice(skip, skip + limit);
+            
+            return response.status(200).json({
+                success: true,
+                message: paginatedProducts.length ? "Products Retrieved." : "No products match your filters.",
+                data: paginatedProducts,
+                filters: {
+                    category: request.query.category || 'All',
+                    priceRange: {
+                        min: request.query.minPrice || 0,
+                        max: request.query.maxPrice || 'Any'
+                    },
+                    rating: selectedRating
+                },
+                pagination: {
+                    total: ratingFilteredProducts.length,
+                    page,
+                    pages: Math.ceil(ratingFilteredProducts.length / limit),
+                    limit
+                }
+            });
+        }
+
+        // No rating filter - normal flow
         const totalProducts = await Product.countDocuments(filter);
         const products = await Product.find(filter)
             .populate('category')
@@ -606,17 +689,34 @@ exports.getProductByMultipleFilters = async (request, response) => {
             .limit(limit)
             .exec();
 
+        // Calculate ratings for each product from reviews
+        const productsWithRatings = await Promise.all(products.map(async (product) => {
+            const reviews = await Review.find({ product: product._id });
+            
+            let calculatedRating = 0;
+            if (reviews.length > 0) {
+                const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
+                calculatedRating = parseFloat((totalRating / reviews.length).toFixed(1));
+            }
+            
+            return {
+                ...product.toObject(),
+                ratings: calculatedRating,
+                numOfReviews: reviews.length
+            };
+        }));
+
         response.status(200).json({
             success: true,
-            message: products.length ? "Products Retrieved." : "No products match your filters.",
-            data: products,
+            message: productsWithRatings.length ? "Products Retrieved." : "No products match your filters.",
+            data: productsWithRatings,
             filters: {
                 category: request.query.category || 'All',
                 priceRange: {
                     min: request.query.minPrice || 0,
                     max: request.query.maxPrice || 'Any'
                 },
-                minRating: request.query.minRating || 0
+                rating: 0
             },
             pagination: {
                 total: totalProducts,

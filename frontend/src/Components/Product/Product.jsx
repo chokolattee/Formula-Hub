@@ -29,7 +29,7 @@ const Product = ({ product, lastProductRef }) => {
                 <div className="product-category f1-category">
                     {product.category?.name || 'Uncategorized'}
                 </div>
-                <div style={{ marginBottom: '10px' }}>
+                <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Rating
                         value={product.ratings || 0}
                         precision={0.5}
@@ -41,8 +41,11 @@ const Product = ({ product, lastProductRef }) => {
                             },
                         }}
                     />
-                    <Typography variant="caption" sx={{ ml: 1, color: '#999' }}>
-                        ({product.numOfReviews || 0})
+                    <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
+                        {product.ratings ? product.ratings.toFixed(1) : '0.0'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#999' }}>
+                        ({product.numOfReviews || 0} {product.numOfReviews === 1 ? 'review' : 'reviews'})
                     </Typography>
                 </div>
                 <div className="tile-controls f1-controls">

@@ -21,7 +21,23 @@ const Profile = () => {
         const file = event.target.files[0];
         if (!file) return;
 
-        console.log("Uploading avatar...")
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file', {
+                position: 'bottom-center'
+            });
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image size should be less than 5MB', {
+                position: 'bottom-center'
+            });
+            return;
+        }
+
+        console.log("Uploading avatar...", file.name)
 
         const formData = new FormData();
         formData.append('avatar', file);
@@ -35,13 +51,25 @@ const Profile = () => {
 
         try {
             const { data } = await axios.put(`http://localhost:8000/api/v1/me/update`, formData, config);
-            toast.success('Avatar updated successfully', {
-                position: 'bottom-center'
-            });
-            getProfile();
+            
+            if (data.success) {
+                toast.success('Avatar updated successfully', {
+                    position: 'bottom-center'
+                });
+                // Update avatar immediately
+                if (data.user.avatar && data.user.avatar.length > 0) {
+                    setAvatarUrl(data.user.avatar[0].url);
+                }
+                getProfile();
+            } else {
+                toast.error(data.message || 'Failed to upload avatar', {
+                    position: 'bottom-center'
+                });
+            }
         } catch (error) {
             console.error("Error uploading avatar:", error);
-            toast.error('Failed to upload avatar', {
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to upload avatar';
+            toast.error(errorMessage, {
                 position: 'bottom-center'
             });
         }

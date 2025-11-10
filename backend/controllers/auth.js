@@ -390,28 +390,54 @@ exports.updateProfile = async (req, res, next) => {
 
         // Update avatar if file is uploaded
         if (req.file) {
-            const user = await User.findById(req.user.id);
-            
-            // Delete old avatar if exists
-            if (user.avatar && user.avatar.length > 0 && user.avatar[0].public_id) {
-                const image_id = user.avatar[0].public_id;
-                // Only delete if it's not a default avatar
-                if (image_id !== 'google_oauth' && image_id !== 'facebook_oauth') {
-                    await cloudinary.v2.uploader.destroy(image_id);
+            try {
+                const user = await User.findById(req.user.id);
+                
+                // Delete old avatar if exists
+                if (user.avatar && user.avatar.length > 0 && user.avatar[0].public_id) {
+                    const image_id = user.avatar[0].public_id;
+                    // Only delete if it's not a default avatar
+                    if (image_id !== 'google_oauth' && image_id !== 'facebook_oauth') {
+                        try {
+                            await cloudinary.v2.uploader.destroy(image_id);
+                        } catch (deleteError) {
+                            console.log('Error deleting old avatar:', deleteError.message);
+                            // Continue even if delete fails
+                        }
+                    }
                 }
+
+                // Upload new avatar to Cloudinary
+                const result = await new Promise((resolve, reject) => {
+                    const uploadStream = cloudinary.v2.uploader.upload_stream(
+                        {
+                            folder: 'avatars',
+                            width: 512,
+                            height: 512,
+                            crop: "fill",
+                            quality: "auto",
+                            resource_type: "auto"
+                        },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        }
+                    );
+                    uploadStream.end(req.file.buffer);
+                });
+
+                newUserData.avatar = [{
+                    public_id: result.public_id,
+                    url: result.secure_url
+                }];
+            } catch (uploadError) {
+                console.error('Cloudinary upload error:', uploadError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Failed to upload avatar to Cloudinary',
+                    error: uploadError.message
+                });
             }
-
-            // Upload new avatar
-            const result = await cloudinary.v2.uploader.upload(req.file.path, {
-                folder: 'avatars',
-                width: 150,
-                crop: "scale"
-            });
-
-            newUserData.avatar = [{
-                public_id: result.public_id,
-                url: result.secure_url
-            }];
         }
 
         const updatedUser = await User.findByIdAndUpdate(req.user.id, newUserData, {

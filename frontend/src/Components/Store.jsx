@@ -337,7 +337,7 @@ const Store = () => {
                                 )}
                                 {rating > 0 && (
                                     <span className="filter-tag">
-                                        {rating} Star{rating !== 1 ? 's' : ''}
+                                        {rating} Star{rating !== 1 ? 's' : ''} Only
                                         <button onClick={() => handleRatingChange(0)}>✕</button>
                                     </span>
                                 )}

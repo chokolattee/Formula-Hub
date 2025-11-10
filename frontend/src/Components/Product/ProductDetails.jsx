@@ -422,8 +422,8 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                                 <div className="row">
                                                     <div className="col-md-2 col-3">
                                                         <img
-                                                            src={review?.user?.avatar || '/images/default_avatar.jpg'}
-                                                            alt={review?.user?.name}
+                                                            src={review?.user?.avatar?.[0]?.url || '/images/default_avatar.jpg'}
+                                                            alt={review?.user?.first_name || 'User'}
                                                             className="review-avatar"
                                                             loading="lazy"
                                                         />
@@ -432,7 +432,7 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                                         <div className="review-header">
                                                             <div className="review-author">
                                                                 <h5 className="reviewer-name">
-                                                                    {review?.user?.name || 'Anonymous'}
+                                                                    {review?.user?.first_name || 'User'}
                                                                 </h5>
                                                                 <small className="review-date">
                                                                     {new Date(review?.createdAt).toLocaleDateString()}
@@ -471,13 +471,6 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {review?.order && (
-                                                            <div className="review-order-info">
-                                                                <small>
-                                                                    Order #{review.order.orderNumber} • {review.order.orderStatus}
-                                                                </small>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
