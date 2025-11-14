@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import '../../App.css'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getUser, logout } from '../Utils/helpers'
 import { toast } from 'react-toastify'
 import { FaSearch, FaShoppingBag, FaUser, FaSignInAlt } from "react-icons/fa";
@@ -12,6 +12,7 @@ const Header = ({ cartItems }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const navigate = useNavigate()
+    const location = useLocation()
 
     const logoutHandler = () => {
         logout(navigate('/'));
@@ -20,11 +21,24 @@ const Header = ({ cartItems }) => {
 
     const handleScroll = () => setIsScrolled(window.scrollY >= 800);
 
+    const handleSearch = (e) => {
+        if (e.key === 'Enter' && searchQuery.trim()) {
+            navigate(`/search/${encodeURIComponent(searchQuery)}`);
+        }
+    }
+
     useEffect(() => {
         setUser(getUser())
         window.addEventListener('scroll', handleScroll)
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
+
+   
+    useEffect(() => {
+        if (location.pathname === '/') {
+            setSearchQuery('')
+        }
+    }, [location.pathname])
 
     if (user?.role === 'admin') {
         return <Sidebar />
@@ -53,11 +67,9 @@ const Header = ({ cartItems }) => {
                             type="text"
                             placeholder="Search..."
                             className="search-input"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    navigate(`/search?query=${encodeURIComponent(e.target.value)}`);
-                                }
-                            }}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={handleSearch}
                         />
                     </div>
 

@@ -14,6 +14,7 @@ const Home = () => {
     const [loadingMore, setLoadingMore] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [hasMore, setHasMore] = useState(true)
+    const [isSearchMode, setIsSearchMode] = useState(false)
 
     let { keyword } = useParams();
 
@@ -23,13 +24,13 @@ const Home = () => {
         if (observer.current) observer.current.disconnect()
         
         observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore) {
+            if (entries[0].isIntersecting && hasMore && !isSearchMode) {
                 setCurrentPage(prevPage => prevPage + 1)
             }
         })
         
         if (node) observer.current.observe(node)
-    }, [loadingMore, hasMore])
+    }, [loadingMore, hasMore, isSearchMode])
 
     const getProducts = async (keyword = '', page = 1, isNewSearch = false) => {
         try {
@@ -66,27 +67,53 @@ const Home = () => {
         }
     }
 
-    // Initial load
+    const searchProducts = async (keyword) => {
+        try {
+            setLoading(true)
+            setIsSearchMode(true)
+            
+            const { data } = await axios.get(`http://localhost:8000/api/v1/search/${keyword}`)
+            console.log('Search Results:', data)
+            
+            setProducts(data)
+            setHasMore(false) 
+            setLoading(false)
+        } catch (error) {
+            console.error('Error searching products:', error)
+            setProducts([])
+            setLoading(false)
+        }
+    }
+
+    // Initial load or search
     useEffect(() => {
         setLoading(true)
         setTimeout(() => {
             setProducts([])
             setCurrentPage(1)
             setHasMore(true)
-            getProducts(keyword, 1, true)
+            
+            if (keyword) {
+                // Search mode
+                searchProducts(keyword)
+            } else {
+                // Normal mode - load all products with pagination
+                setIsSearchMode(false)
+                getProducts('', 1, true)
+            }
         }, 500);
     }, [keyword]);
 
-    // Load more products when page changes
+    // Load more products when page changes 
     useEffect(() => {
-        if (currentPage > 1) {
-            getProducts(keyword, currentPage, false)
+        if (currentPage > 1 && !isSearchMode) {
+            getProducts('', currentPage, false)
         }
-    }, [currentPage]);
+    }, [currentPage, isSearchMode]);
     
     return (
         <>
-            <MetaData title={'FormulaHub | F1 Collectibles Store'} />
+            <MetaData title={keyword ? `Search: ${keyword} | FormulaHub` : 'FormulaHub | F1 Collectibles Store'} />
             {loading && currentPage === 1 ? <Loader /> : (
                 <>
                     <section className="hero-section f1-hero">
@@ -98,53 +125,45 @@ const Home = () => {
                                     <FaInstagram />
                                     <FaTwitterSquare />
                                 </div>
-                                <h1 className="hero-main-title">FORMULA HUB</h1>
-                                <p className="hero-subtitle">Premium F1 Collectibles & Racing Memorabilia</p>
-                                <div className="hero-features-list">
-                                    <div className="hero-feature-badge">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#DC0000"/>
-                                        </svg>
-                                        <span>Authentic Items</span>
-                                    </div>
-                                    <div className="hero-feature-badge">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M14.4 6L14 4H5V21H7V14H12.6L13 16H20V6H14.4Z" fill="#DC0000"/>
-                                        </svg>
-                                        <span>Limited Editions</span>
-                                    </div>
-                                </div>
-                                <button className="hero-cta-button">RACE TO SHOP</button>
+                                <h1 className="hero-main-title">
+                                    {keyword ? `SEARCH RESULTS` : 'FORMULA HUB'}
+                                </h1>
+                                <p className="hero-subtitle">
+                                    {keyword ? `Showing results for "${keyword}"` : 'Premium F1 Collectibles & Racing Memorabilia'}
+                                </p>
+                                {!keyword && (
+                                    <>
+                                        <div className="hero-features-list">
+                                            <div className="hero-feature-badge">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#DC0000"/>
+                                                </svg>
+                                                <span>Authentic Items</span>
+                                            </div>
+                                            <div className="hero-feature-badge">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M14.4 6L14 4H5V21H7V14H12.6L13 16H20V6H14.4Z" fill="#DC0000"/>
+                                                </svg>
+                                                <span>Limited Editions</span>
+                                            </div>
+                                        </div>
+                                        <button className="hero-cta-button">RACE TO SHOP</button>
+                                    </>
+                                )}
                             </div>
-                            <div className="hero-right-content">
-                                <div className="hero-product-box hero-product-1">
-                                    <div className="hero-product-content">
-                                        <h3>RACING<br/>HELMET</h3>
-                                        <p className="hero-product-price">$ 299.99</p>
-                                    </div>
-                                </div>
-                                <div className="hero-product-box hero-product-2">
-                                    <div className="hero-product-content">
-                                        <h3>TEAM JERSEY<br/>2024</h3>
-                                        <p className="hero-product-price">$ 89.99</p>
-                                    </div>
-                                </div>
-                                <div className="hero-product-box hero-product-3">
-                                    <div className="hero-product-content">
-                                        <h3>1:18 SCALE<br/>MODEL</h3>
-                                        <p className="hero-product-price">$ 159.99</p>
-                                    </div>
-                                </div>
-                                <div className="hero-red-square"></div>
-                                <div className="hero-black-square"></div>
-                            </div>
+                            <div className="hero-red-square"></div>
+                            <div className="hero-black-square"></div>
                         </div>
                     </section>
                     <section className='light-section f1-section'>
                         <div className="section-header f1-section-header">
                             <div className="section-texts">
-                                <div className="section-header__title f1-section-title">Championship Collection</div>
-                                <div className="section-sub__header f1-subtitle">Official F1 Memorabilia & Collectibles</div>
+                                <div className="section-header__title f1-section-title">
+                                    {keyword ? `Search Results (${products.length})` : 'Championship Collection'}
+                                </div>
+                                <div className="section-sub__header f1-subtitle">
+                                    {keyword ? `Found ${products.length} product${products.length !== 1 ? 's' : ''}` : 'Official F1 Memorabilia & Collectibles'}
+                                </div>
                             </div>
                         </div>
                         <div className="store-primary f1-store">
@@ -153,17 +172,19 @@ const Home = () => {
                                     <Product 
                                         key={product._id}
                                         product={product}
-                                        lastProductRef={products.length === index + 1 ? lastProductRef : null}
+                                        lastProductRef={!isSearchMode && products.length === index + 1 ? lastProductRef : null}
                                     />
                                 ))
                             ) : (
                                 <div className="col-12 text-center">
-                                    <p style={{ color: '#000' }}>No products found</p>
+                                    <p style={{ color: '#000' }}>
+                                        {keyword ? `No products found matching "${keyword}"` : 'No products found'}
+                                    </p>
                                 </div>
                             )}
 
-                            {/* Loading Skeletons */}
-                            {loadingMore && (
+                            {/* Loading Skeletons - only show in normal mode */}
+                            {loadingMore && !isSearchMode && (
                                 <>
                                     <Skeleton variant="rounded" width="100%" height={420} sx={{ bgcolor: 'rgba(220, 0, 0, 0.1)' }} />
                                     <Skeleton variant="rounded" width="100%" height={420} sx={{ bgcolor: 'rgba(220, 0, 0, 0.1)' }} />

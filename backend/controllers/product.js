@@ -428,6 +428,31 @@ exports.getProductDetails = async (request, response) => {
     }
 };
 
+exports.searchProduct = async (request, response) => {
+    try {
+        const keyword = request.params.keyword;
+
+        // Create a search query that matches product name only
+        const searchQuery = keyword ? {
+            name: { $regex: keyword, $options: 'i' }
+        } : {};
+
+        // Find products and populate category and team references
+        const products = await Product.find(searchQuery)
+            .populate('category', 'name')
+            .populate('team', 'name');
+
+        response.status(200).json(products);
+
+    } catch (error) {
+        response.status(500).json({
+            success: false,
+            message: 'Error searching products',
+            error: error.message
+        });
+    }
+}
+
 //filter routes
 exports.getProductByCategory = async (request, response) => {
     try {

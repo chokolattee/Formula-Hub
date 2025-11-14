@@ -105,21 +105,21 @@ const Login = () => {
             console.log("Firebase registration successful!");
             console.log("User UID:", user.uid);
 
-            // Get token and send to backend
+            // Get token and send to backend WITH PASSWORD
             const token = await user.getIdToken();
             
+            // CRITICAL FIX: Send password to backend so MongoDB can store the same password
             const res = await axios.post("http://localhost:8000/api/v1/register", { 
-                email, 
-                password,
-                token 
+                token,
+                password  // ✅ Now sending the actual password user entered
             });
 
             if (res.data.success) {
-            toast.success("Registration successful! Please login.", {
-                position: 'bottom-right'
-            })
-            setFormActive('login')
-            resetForm()
+                toast.success("Registration successful! Please login.", {
+                    position: 'bottom-right'
+                })
+                setFormActive('login')
+                resetForm()
                 return true;
             } else {
                 setError(res.data.message || "Registration failed")
@@ -162,6 +162,7 @@ const Login = () => {
             const success = await loginAttempt()
             if (success) {
                 setTimeout(() => {
+                    navigate('/');
                     window.location.reload();
                 }, 1000)
             }
@@ -185,6 +186,7 @@ const Login = () => {
             if (res.data.success) {
                 authenticate(res.data, () => {
                     setTimeout(() => {
+                        navigate('/');
                         window.location.reload();
                     }, 1000);
                 })
@@ -205,7 +207,7 @@ const Login = () => {
             setLoading(true)
             setError('')
             
-            const user = await signInWithFacebook()  // Note: using your typo name
+            const user = await signInWithFacebook()
             const token = await user.getIdToken();
 
             const res = await axios.post("http://localhost:8000/api/v1/auth/facebook", { token });
@@ -213,6 +215,7 @@ const Login = () => {
             if (res.data.success) {
                 authenticate(res.data, () => {
                     setTimeout(() => {
+                        navigate('/');
                         window.location.reload();
                     }, 1000);
                 })
@@ -321,8 +324,9 @@ const Login = () => {
                                                     borderBottomColor: "#666666"
                                                 },
                                                 "& .MuiInputBase-input": {
-                                                    color: "#000000",
-                                                    fontWeight: "500"
+                                                    color: "#000000 !important",
+                                                    fontWeight: "500",
+                                                    WebkitTextFillColor: "#000000 !important"
                                                 },
                                                 "& .MuiInputLabel-root": {
                                                     color: "#333333",
@@ -355,8 +359,9 @@ const Login = () => {
                                                     borderBottomColor: "#666666"
                                                 },
                                                 "& .MuiInputBase-input": {
-                                                    color: "#000000",
-                                                    fontWeight: "500"
+                                                    color: "#000000 !important",
+                                                    fontWeight: "500",
+                                                    WebkitTextFillColor: "#000000 !important"
                                                 },
                                                 "& .MuiInputLabel-root": {
                                                     color: "#333333",
@@ -516,6 +521,7 @@ const Login = () => {
 
                         .input-group {
                             margin-bottom: 10px;
+                            color: #1a1a1aff;
                         }
 
                         .between-utils {
