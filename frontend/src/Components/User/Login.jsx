@@ -16,7 +16,31 @@ import {
   signInWithFacebook 
 } from '../Firebase/auth';
 import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 
+// Validation schemas
+const loginSchema = yup.object({
+    email: yup
+        .string()
+        .required('Email is required')
+        .email('Invalid email address'),
+    password: yup
+        .string()
+        .required('Password is required')
+        .min(1, 'Password is required')
+}).required();
+
+const registerSchema = yup.object({
+    email: yup
+        .string()
+        .required('Email is required')
+        .email('Invalid email address'),
+    password: yup
+        .string()
+        .required('Password is required')
+        .min(6, 'Password must be at least 6 characters')
+}).required();
 
 const Login = () => {
     const [loading, setLoading] = useState(false)
@@ -29,7 +53,7 @@ const Login = () => {
 
     const redirect = location.search ? new URLSearchParams(location.search).get('redirect') : ''
 
-    // React Hook Form setup
+    // React Hook Form setup with dynamic schema
     const {
         register,
         handleSubmit,
@@ -38,6 +62,7 @@ const Login = () => {
         clearErrors
     } = useForm({
         mode: 'onBlur',
+        resolver: yupResolver(formActive === 'login' ? loginSchema : registerSchema),
         defaultValues: {
             email: '',
             password: ''
@@ -106,19 +131,23 @@ const Login = () => {
         try {
             setError('')
             console.log("=== REGISTER ATTEMPT ===");
+            console.log("Email:", email);
+            console.log("Password length:", password.length);
 
             // Register with Firebase
             const user = await firebaseRegister(email, password)
             console.log("Firebase registration successful!");
             console.log("User UID:", user.uid);
 
-            // Get token and send to backend WITH PASSWORD
             const token = await user.getIdToken();
             
+            console.log("Sending registration data to backend...");
             const res = await axios.post("http://localhost:8000/api/v1/register", { 
                 token,
                 password  
             });
+
+            console.log("Backend response:", res.data);
 
             if (res.data.success) {
                 toast.success("Registration successful! Please login.", {
@@ -132,7 +161,11 @@ const Login = () => {
                 return false;
             }
         } catch (e) {
-            console.error("Registration error:", e)
+            console.error("=== REGISTRATION ERROR ===");
+            console.error("Error code:", e.code);
+            console.error("Error message:", e.message);
+            console.error("Full error:", e);
+            
             let errorMessage = "Registration failed. Please try again."
             
             // Handle specific Firebase errors
@@ -240,6 +273,12 @@ const Login = () => {
         navigate('/')
     }
 
+    // Switch between login and register forms
+    const handleFormSwitch = (formType) => {
+        setFormActive(formType)
+        resetForm()
+    }
+
     useEffect(() => {
         if (getUser() && redirect === 'shipping') {
             navigate(`/${redirect}`)
@@ -276,10 +315,7 @@ const Login = () => {
                             <div className="form-selection">
                                 <button
                                     className={`styled-button ${formActive === 'login' ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setFormActive('login')
-                                        resetForm()
-                                    }}
+                                    onClick={() => handleFormSwitch('login')}
                                     disabled={loading}
                                 >
                                     Sign In
@@ -287,10 +323,7 @@ const Login = () => {
 
                                 <button
                                     className={`styled-button ${formActive === 'register' ? 'active' : ''}`}
-                                    onClick={() => {
-                                        setFormActive('register')
-                                        resetForm()
-                                    }}
+                                    onClick={() => handleFormSwitch('register')}
                                     disabled={loading}
                                 >
                                     Sign Up
@@ -309,13 +342,7 @@ const Login = () => {
                                             fullWidth
                                             error={!!errors.email}
                                             helperText={errors.email?.message}
-                                            {...register('email', {
-                                                required: 'Email is required',
-                                                pattern: {
-                                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                                    message: 'Invalid email address'
-                                                }
-                                            })}
+                                            {...register('email')}
                                             sx={{
                                                 "& .MuiInputLabel-root.Mui-focused": {
                                                     color: "var(--primary-color)"
@@ -352,15 +379,7 @@ const Login = () => {
                                             fullWidth
                                             error={!!errors.password}
                                             helperText={errors.password?.message}
-                                            {...register('password', {
-                                                required: 'Password is required',
-                                                minLength: {
-                                                    value: formActive === 'register' ? 6 : 1,
-                                                    message: formActive === 'register' 
-                                                        ? 'Password must be at least 6 characters' 
-                                                        : 'Password is required'
-                                                }
-                                            })}
+                                            {...register('password')}
                                             sx={{
                                                 "& .MuiInputLabel-root.Mui-focused": {
                                                     color: "var(--primary-color)"

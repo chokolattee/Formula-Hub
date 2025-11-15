@@ -35,7 +35,7 @@ exports.checkUser = async (req, res) => {
     }
 }
 
-exports.loginwithGoogle = async (req,res) => {
+exports.loginwithGoogle = async (req, res) => {
     try {
         const { token } = req.body;
         
@@ -60,9 +60,20 @@ exports.loginwithGoogle = async (req,res) => {
                 last_name: lastName || "",
                 avatar: [{ public_id: "google_oauth", url: photoURL }],
             });
-        } else if (user.authProvider === 'email') {
-            user.authProvider = 'both';
-            await user.save();
+        } else {
+            // Check if existing account is deactivated
+            if (user.status === 'deactivated') {
+                return res.status(403).json({
+                    success: false,
+                    message: "Your account has been deactivated. Please contact the administrator to reactivate your account."
+                });
+            }
+            
+            // Update authProvider if needed
+            if (user.authProvider === 'email') {
+                user.authProvider = 'both';
+                await user.save();
+            }
         }
 
         sendToken(user, 200, res);
@@ -70,7 +81,7 @@ exports.loginwithGoogle = async (req,res) => {
         console.log("Error in Google login: ", e.message);
         res.status(500).json({ success: false, message: "Google login failed. Please try again." });
     }
-}
+};
 
 exports.loginwithFacebook = async (req, res) => {
      try {
@@ -111,7 +122,7 @@ exports.loginwithFacebook = async (req, res) => {
 
 exports.registerUser = async (req, res, next) => {
     try {
-        const { token } = req.body;
+        const { token, password } = req.body;
         
         if (!token) {
             return res.status(400).json({ 
@@ -137,7 +148,7 @@ exports.registerUser = async (req, res, next) => {
         // Create user in MongoDB
         user = await User.create({
             email: email,
-            password: null,
+            password: password,
             authProvider: 'email'
         });
         
@@ -173,10 +184,11 @@ exports.loginUser = async (req, res, next) => {
       });
     }
 
+    // Check if account is deactivated
     if (user.status === "deactivated") {
       return res.status(403).json({
         success: false,
-        message: "Your account has been deactivated. Please contact admin."
+        message: "Your account has been deactivated. Please contact the administrator to reactivate your account."
       });
     }
 
@@ -630,3 +642,51 @@ exports.updatePassword = async (req, res, next) => {
         });
     }
 }
+
+exports.deactivateAccount = async (req, res, next) => {
+    try {
+        const { currentPassword } = req.body;
+        const user = await User.findById(req.user.id).select('+password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if user has a password 
+        if (!user.password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot deactivate account. Please set a password first.'
+            });
+        }
+
+        // Verify current password
+        const isPasswordMatched = await user.comparePassword(currentPassword);
+
+        if (!isPasswordMatched) {
+            return res.status(401).json({
+                success: false,
+                message: 'Current password is incorrect'
+            });
+        }
+
+        // Update user status 
+        user.status = 'deactivated';
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Account deactivated successfully. Please contact admin to reactivate your account.'
+        });
+
+    } catch (error) {
+        console.error('Deactivate account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while deactivating the account'
+        });
+    }
+};

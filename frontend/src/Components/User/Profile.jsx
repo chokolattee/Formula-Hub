@@ -389,11 +389,18 @@ const AccountOverview = ({ user, getProfile }) => {
 
 const Settings = ({ user, getProfile }) => {
     const [showPasswordForm, setShowPasswordForm] = useState(false);
+    const [showDeactivateForm, setShowDeactivateForm] = useState(false);
     const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
         defaultValues: {
             oldPassword: '',
             password: '',
             confirmPassword: ''
+        }
+    });
+
+    const { register: registerDeactivate, handleSubmit: handleSubmitDeactivate, formState: { errors: deactivateErrors }, reset: resetDeactivate } = useForm({
+        defaultValues: {
+            currentPassword: ''
         }
     });
 
@@ -454,9 +461,42 @@ const Settings = ({ user, getProfile }) => {
         }
     };
 
+    const onDeactivateSubmit = async (formData) => {
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        }
+
+        try {
+            const { data } = await axios.put(
+                'http://localhost:8000/api/v1/me/deactivate',
+                { currentPassword: formData.currentPassword },
+                config
+            );
+
+            toast.success(data.message || 'Account deactivated successfully', {
+                position: 'bottom-center'
+            });
+            
+            resetDeactivate();
+            setShowDeactivateForm(false);
+            
+            // Logout: Clear token and redirect to login page after deactivation
+            setTimeout(() => {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+            }, 2000);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Error deactivating account', {
+                position: 'bottom-center'
+            });
+        }
+    };
+
     return (
         <div className="tab-content-wrapper">
-            {!showPasswordForm ? (
+            {!showPasswordForm && !showDeactivateForm ? (
                 <div className="settings-card">
                     <button
                         className="settings-action-button"
@@ -465,8 +505,22 @@ const Settings = ({ user, getProfile }) => {
                         <MdSettings size={20} />
                         <span>{needsPasswordSetup ? 'Set Password' : 'Change Password'}</span>
                     </button>
+                    
+                    <button
+                        className="settings-action-button danger"
+                        onClick={() => setShowDeactivateForm(true)}
+                        style={{ 
+                            marginTop: '15px',
+                            backgroundColor: '#fff',
+                            border: '2px solid #dc3545',
+                            color: '#dc3545'
+                        }}
+                    >
+                        <MdSettings size={20} />
+                        <span>Deactivate Account</span>
+                    </button>
                 </div>
-            ) : (
+            ) : showPasswordForm ? (
                 <form className="edit-form" onSubmit={handleSubmit(onSubmit)}>
                     {!needsPasswordSetup && (
                         <div className="form-group">
@@ -538,6 +592,58 @@ const Settings = ({ user, getProfile }) => {
                             onClick={() => {
                                 setShowPasswordForm(false);
                                 reset();
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <form className="edit-form" onSubmit={handleSubmitDeactivate(onDeactivateSubmit)}>
+                    <div style={{ 
+                        backgroundColor: '#fff3cd', 
+                        border: '1px solid #ffc107',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        marginBottom: '20px'
+                    }}>
+                        <h4 style={{ color: '#856404', marginBottom: '10px', fontSize: '16px' }}>
+                            ⚠️ Warning: Account Deactivation
+                        </h4>
+                        <p style={{ color: '#856404', fontSize: '14px', margin: 0 }}>
+                            Deactivating your account will permanently disable your access. To reactivate, you must contact the administrator.
+                        </p>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Enter Current Password to Confirm *</label>
+                        <input
+                            type="password"
+                            className="form-input"
+                            placeholder="Enter your current password"
+                            {...registerDeactivate('currentPassword', {
+                                required: 'Password is required to deactivate your account'
+                            })}
+                        />
+                        {deactivateErrors.currentPassword && (
+                            <span className="error-message">{deactivateErrors.currentPassword.message}</span>
+                        )}
+                    </div>
+
+                    <div className="form-buttons">
+                        <button 
+                            type="submit" 
+                            className="save-button"
+                            style={{ backgroundColor: '#dc3545', border: 'none' }}
+                        >
+                            Deactivate Account
+                        </button>
+                        <button
+                            type="button"
+                            className="cancel-button"
+                            onClick={() => {
+                                setShowDeactivateForm(false);
+                                resetDeactivate();
                             }}
                         >
                             Cancel

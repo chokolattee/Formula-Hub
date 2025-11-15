@@ -4,100 +4,138 @@ import MetaData from '../Layout/MetaData'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
+import '../../Styles/auth.css'
+
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+
+const schema = yup.object().shape({
+    password: yup
+        .string()
+        .required("Password is required")
+        .min(6, "Password must be at least 6 characters"),
+    confirmPassword: yup
+        .string()
+        .oneOf([yup.ref("password")], "Passwords do not match")
+        .required("Confirm Password is required")
+});
 
 const NewPassword = () => {
-    const [password, setPassword] = useState('')
-    const [confirmPassword, setConfirmPassword] = useState('')
+    const navigate = useNavigate();
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+    const { token } = useParams();
 
-    let navigate = useNavigate();
-    const [error, setError] = useState('')
-    const [success, setSuccess] = useState(false)
+    const {
+        register,
+        handleSubmit,
+        formState: { errors }
+    } = useForm({
+        resolver: yupResolver(schema)
+    });
 
-    let { token } = useParams();
-    console.log(token)
-
-    const resetPassword = async (token, passwords) => {
-        console.log(passwords)
+    const resetPassword = async (token, formData) => {
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-            const { data } = await axios.put(`http://localhost:8000/api/v1/password/reset/${token}`, passwords, config)
+            const config = { headers: { 'Content-Type': 'application/json' } };
 
-            setSuccess(data.success)
+            const { data } = await axios.put(
+                `http://localhost:8000/api/v1/password/reset/${token}`,
+                formData,
+                config
+            );
+
+            setSuccess(data.success);
         } catch (error) {
-            console.log(error)
-            setError(error)
+            setError(error.response?.data?.message || "Something went wrong");
         }
-    }
+    };
+
     useEffect(() => {
         if (error) {
-            toast.error(error, {
-                position: 'bottom-right'
-            });
+            toast.error(error, { position: 'bottom-right' });
         }
         if (success) {
-            toast.success('password updated', {
-                position: 'bottom-right'
-            });
-            navigate('/login')
+            toast.success('Password updated successfully!', { position: 'bottom-right' });
+            navigate('/login');
         }
+    }, [error, success, navigate]);
 
-    }, [error, success,])
-
-    const submitHandler = (e) => {
-        e.preventDefault();
+    const onSubmit = (data) => {
         const formData = new FormData();
-        formData.set('password', password);
-        formData.set('confirmPassword', confirmPassword);
-        resetPassword(token, formData)
-    }
+        formData.set('password', data.password);
+        formData.set('confirmPassword', data.confirmPassword);
+
+        resetPassword(token, formData);
+    };
 
     return (
         <>
-            <MetaData title={'New Password Reset'} />
-            <div className="row wrapper">
-                <div className="col-10 col-lg-5">
-                    <form className="shadow-lg" onSubmit={submitHandler}>
-                        <h1 className="mb-3">New Password</h1>
+            <MetaData title="New Password Reset" />
 
-                        <div className="form-group">
-                            <label htmlFor="password_field">Password</label>
-                            <input
-                                type="password"
-                                id="password_field"
-                                className="form-control"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
+            <div className="auth-wrapper">
+                <div className="auth-container">
+                    <div className="auth-card">
+
+                        <div className="auth-header">
+                            <h2 className="auth-title">Reset Password</h2>
+                            <p className="auth-subtitle">
+                                Enter your new password below
+                            </p>
                         </div>
 
-                        <div className="form-group">
-                            <label htmlFor="confirm_password_field">Confirm Password</label>
-                            <input
-                                type="password"
-                                id="confirm_password_field"
-                                className="form-control"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                            />
-                        </div>
+                        <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
 
-                        <button
-                            id="new_password_button"
-                            type="submit"
-                            className="btn btn-block py-3">
-                            Set Password
-                        </button>
+                            {/* Password */}
+                            <div className="form-group">
+                                <label className="form-label">New Password</label>
 
-                    </form>
+                                <div className="input-wrapper">
+                                    <i className="input-icon ri-lock-password-line"></i>
+
+                                    <input
+                                        type="password"
+                                        className={`form-input ${errors.password ? "invalid" : ""}`}
+                                        {...register("password")}
+                                    />
+                                </div>
+
+                                {/* Validation Error */}
+                                {errors.password && (
+                                    <p className="error-message">{errors.password.message}</p>
+                                )}
+                            </div>
+
+                            {/* Confirm Password */}
+                            <div className="form-group">
+                                <label className="form-label">Confirm New Password</label>
+
+                                <div className="input-wrapper">
+                                    <i className="input-icon ri-lock-line"></i>
+
+                                    <input
+                                        type="password"
+                                        className={`form-input ${errors.confirmPassword ? "invalid" : ""}`}
+                                        {...register("confirmPassword")}
+                                    />
+                                </div>
+
+                                {/* Validation Error */}
+                                {errors.confirmPassword && (
+                                    <p className="error-message">{errors.confirmPassword.message}</p>
+                                )}
+                            </div>
+
+                            <button type="submit" className="auth-submit-btn">
+                                Set Password
+                            </button>
+
+                        </form>
+                    </div>
                 </div>
             </div>
-
         </>
-    )
-}
+    );
+};
 
-export default NewPassword
+export default NewPassword;

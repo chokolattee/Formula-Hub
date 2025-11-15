@@ -13,7 +13,8 @@ const {
     checkUser,
     loginwithGoogle,
     loginwithFacebook,
-    setPassword
+    setPassword,
+    deactivateAccount
 } = require('../controllers/auth');
 
 // Check authenticated user
@@ -38,5 +39,6 @@ router.put('/password/set', isAuthenticatedUser, setPassword);
 // User profile routes
 router.get('/me', isAuthenticatedUser, getUserProfile);
 router.put('/me/update', isAuthenticatedUser, upload.single("avatar"), updateProfile);
+router.put('/me/deactivate', isAuthenticatedUser, deactivateAccount);
 
 module.exports = router;
