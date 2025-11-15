@@ -14,9 +14,9 @@ exports.getDashboardStats = async (req, res, next) => {
         // Get out of stock products
         const outOfStock = await Product.countDocuments({ stock: 0 });
 
-        // Calculate total sales
-        const orders = await Order.find();
-        const totalSales = orders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+        // Calculate total sales (only delivered orders)
+        const deliveredOrders = await Order.find({ orderStatus: 'Delivered' });
+        const totalSales = deliveredOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
 
         // Get order status distribution
         const orderStatusDistribution = await Order.aggregate([
@@ -51,12 +51,56 @@ exports.getDashboardStats = async (req, res, next) => {
     }
 };
 
+exports.getYearlySales = async (req, res, next) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        // Build match query for date filtering and delivered status
+        let matchQuery = { orderStatus: 'Delivered' };
+        if (startDate || endDate) {
+            matchQuery.createdAt = {};
+            if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
+            if (endDate) matchQuery.createdAt.$lte = new Date(endDate);
+        }
+
+        const yearlySales = await Order.aggregate([
+            { $match: matchQuery },
+            {
+                $group: {
+                    _id: { $year: '$createdAt' },
+                    totalSales: { $sum: '$totalPrice' }
+                }
+            },
+            {
+                $sort: { _id: 1 }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    year: { $toString: '$_id' },
+                    sales: '$totalSales'
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: yearlySales
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 exports.getMonthlySales = async (req, res, next) => {
     try {
         const { startDate, endDate } = req.query;
 
-        // Build query
-        let query = {};
+        // Build query - only delivered orders
+        let query = { orderStatus: 'Delivered' };
         if (startDate || endDate) {
             query.createdAt = {};
             if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -242,8 +286,8 @@ exports.getRevenueByCategory = async (req, res, next) => {
     try {
         const { startDate, endDate } = req.query;
 
-        // Build query
-        let query = {};
+        // Build query - only delivered orders
+        let query = { orderStatus: 'Delivered' };
         if (startDate || endDate) {
             query.createdAt = {};
             if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -303,6 +347,7 @@ exports.getDailySales = async (req, res, next) => {
         const dailySales = await Order.aggregate([
             {
                 $match: {
+                    orderStatus: 'Delivered',
                     createdAt: {
                         $gte: new Date(startDate),
                         $lte: new Date(endDate)
@@ -381,6 +426,7 @@ exports.getAllDashboardData = async (req, res, next) => {
         const [
             stats,
             monthlySales,
+            yearlySales,
             topProducts,
             categoryDistribution,
             orderStatusDistribution
@@ -391,8 +437,10 @@ exports.getAllDashboardData = async (req, res, next) => {
                 const totalOrders = await Order.countDocuments();
                 const totalUsers = await User.countDocuments();
                 const outOfStock = await Product.countDocuments({ stock: 0 });
-                const orders = await Order.find();
-                const totalSales = orders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+                
+                // Only count delivered orders for total sales
+                const deliveredOrders = await Order.find({ orderStatus: 'Delivered' });
+                const totalSales = deliveredOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
                 
                 return {
                     totalProducts,
@@ -405,7 +453,7 @@ exports.getAllDashboardData = async (req, res, next) => {
             
             // Monthly Sales
             (async () => {
-                let query = {};
+                let query = { orderStatus: 'Delivered' };
                 if (startDate || endDate) {
                     query.createdAt = {};
                     if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -425,6 +473,38 @@ exports.getAllDashboardData = async (req, res, next) => {
                 });
                 
                 return months.map(month => ({ month, sales: monthlyData[month] }));
+            })(),
+            
+            // Yearly Sales
+            (async () => {
+                let matchQuery = { orderStatus: 'Delivered' };
+                if (startDate || endDate) {
+                    matchQuery.createdAt = {};
+                    if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
+                    if (endDate) matchQuery.createdAt.$lte = new Date(endDate);
+                }
+
+                const yearlySales = await Order.aggregate([
+                    { $match: matchQuery },
+                    {
+                        $group: {
+                            _id: { $year: '$createdAt' },
+                            totalSales: { $sum: '$totalPrice' }
+                        }
+                    },
+                    {
+                        $sort: { _id: 1 }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            year: { $toString: '$_id' },
+                            sales: '$totalSales'
+                        }
+                    }
+                ]);
+
+                return yearlySales;
             })(),
             
             // Top Products
@@ -524,6 +604,7 @@ exports.getAllDashboardData = async (req, res, next) => {
             data: {
                 stats,
                 monthlySales,
+                yearlySales,
                 topProducts,
                 categoryDistribution,
                 orderStatusDistribution

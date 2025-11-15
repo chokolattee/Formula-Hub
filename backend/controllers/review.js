@@ -103,9 +103,11 @@ exports.getReviews = async (req, res) => {
 
         const filter = {};
         
-        if (req.query.product) {
-            if (mongoose.Types.ObjectId.isValid(req.query.product)) {
-                filter.product = new mongoose.Types.ObjectId(req.query.product);
+        // Support both 'id' and 'product' query parameters for product filtering
+        const productId = req.query.id || req.query.product;
+        if (productId) {
+            if (mongoose.Types.ObjectId.isValid(productId)) {
+                filter.product = new mongoose.Types.ObjectId(productId);
             } else {
                 return res.status(400).json({
                     success: false,
@@ -137,13 +139,11 @@ exports.getReviews = async (req, res) => {
             .lean();
 
         let averageRating = null;
-        if (req.query.product) {
+        if (productId) {
             const stats = await Review.aggregate([
                 { 
                     $match: { 
-                        product: mongoose.Types.ObjectId.isValid(req.query.product) 
-                            ? new mongoose.Types.ObjectId(req.query.product)
-                            : null
+                        product: new mongoose.Types.ObjectId(productId)
                     }
                 },
                 {
@@ -167,6 +167,7 @@ exports.getReviews = async (req, res) => {
             success: true,
             message: 'Reviews retrieved successfully.',
             data: reviews,
+            reviews: reviews, // Include both for compatibility
             averageRating,
             pagination: {
                 total,

@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import "primereact/resources/themes/lara-light-cyan/theme.css";
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { getToken, getUser, isAdmin } from '../Utils/helpers';
+
+// Validation Schemas
+import { teamSchema, teamEditSchema } from '../Utils/validationSchema';
 
 // Icons and Imported Components
 import Button from '@mui/material/Button';
@@ -43,10 +48,14 @@ import MetaData from '../Layout/MetaData';
 import '../../Styles/admin.css'
 
 const Team = () => {
-  // MOVED REFS INSIDE THE COMPONENT
+  const navigate = useNavigate();
   const createRef = useRef(null);
   const editRef = useRef(null);
   const infoRef = useRef(null);
+
+  // User and Auth
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
   // CRUD Necessities
   const [apiData, setApiData] = useState([]);
@@ -79,70 +88,31 @@ const Team = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredData, setFilteredData] = useState([]);
 
-  const onChange = e => {
-  const files = Array.from(e.target.files);
-  
-  if (files.length === 0) return;
-  
-  setImagesPreview([]);
-
-  const fileObjects = [];
-  const newPreviews = [];
-
-  files.forEach(file => {
-    fileObjects.push(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (reader.readyState === 2) {
-        newPreviews.push(reader.result);
-        if (newPreviews.length === files.length) {
-          setImagesPreview(newPreviews);
-        }
-      }
-    };
-    reader.readAsDataURL(file);
-  });
-
-  setFormState((prevState) => ({
-    ...prevState,
-    images: fileObjects, 
-  }));
-}
-
-  // for EDIT modal (stores File objects)
-  const onChangeEdit = e => {
-    const files = Array.from(e.target.files);
+  // Check authentication on mount
+  useEffect(() => {
+    const currentUser = getUser();
+    const currentToken = getToken();
     
-    if (files.length === 0) return;
+    if (!currentUser || !currentToken) {
+      navigate('/login');
+      return;
+    }
 
-    setImagesPreview([]);
+    if (currentUser.role !== 'admin') {
+      navigate('/');
+      return;
+    }
 
-    const fileObjects = [];
-    const newPreviews = [];
+    setUser(currentUser);
+    setToken(currentToken);
+  }, [navigate]);
 
-    files.forEach(file => {
-      fileObjects.push(file);
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.readyState === 2) {
-          newPreviews.push(reader.result);
-          if (newPreviews.length === files.length) {
-            setImagesPreview(newPreviews);
-          }
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    setFormState((prevState) => ({
-      ...prevState,
-      images: fileObjects, 
-    }));
-  }
+  // Get axios config with auth header
+  const getAxiosConfig = () => ({
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
 
   const resetFormstate = () => {
     setFormState({ 
@@ -200,60 +170,84 @@ const Team = () => {
     }));
     
     setInfoModal(true);
-}
-
-const handleSubmit = async (event) => {
-  event.preventDefault();
-  try {
-    const formData = new FormData();
-    formData.append('name', formState.name);
-    formData.append('description', formState.description);
-
-    formState.images.forEach((file) => {
-      formData.append('images', file);
-    });
-
-    const response = await axios.post('http://localhost:8000/api/v1/team', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 30000,
-    });
-
-    const newTeam = {
-      _id: response.data.data._id,
-      name: response.data.data.name,
-      description: response.data.data.description,
-      images: response.data.data.images,
-      createdAt: new Date().toLocaleString(),
-      updatedAt: new Date().toLocaleString(),
-    };
-    
-    setApiData((prevData) => [...prevData, newTeam]);
-    setOpenModal(false);
-    resetFormstate();
-
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
-  } catch (error) {
-    console.error('Error creating team:', error);
-    alert('Failed to create team: ' + (error.response?.data?.message || error.message));
   }
-};
 
-  const handleUpdate = async () => {
+  // Handle Submit for CREATE
+  const handleSubmit = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to create teams');
+      navigate('/login');
+      return;
+    }
+
     try {
       const formData = new FormData();
-      formData.append('name', formState.name);
-      formData.append('description', formState.description);
+      formData.append('name', validatedData.name);
+      formData.append('description', validatedData.description);
 
-      if (formState.images && formState.images.length > 0) {
-        formState.images.forEach(file => {
-          // New upload
+      if (validatedData.images && validatedData.images.length > 0) {
+        Array.from(validatedData.images).forEach((file) => {
+          formData.append('images', file);
+        });
+      }
+
+      const response = await axios.post(
+        'http://localhost:8000/api/v1/team', 
+        formData, 
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          },
+          timeout: 30000,
+        }
+      );
+
+      const newTeam = {
+        _id: response.data.data._id,
+        name: response.data.data.name,
+        description: response.data.data.description,
+        images: response.data.data.images,
+        createdAt: new Date().toLocaleString(),
+        updatedAt: new Date().toLocaleString(),
+      };
+      
+      setApiData((prevData) => [...prevData, newTeam]);
+      setOpenModal(false);
+      resetFormstate();
+      alert('Team created successfully!');
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Error creating team:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to create team: ' + (error.response?.data?.message || error.message));
+      }
+    }
+  };
+
+  // Handle Update for EDIT
+  const handleUpdate = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to update teams');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('name', validatedData.name);
+      formData.append('description', validatedData.description);
+
+      if (validatedData.images && validatedData.images.length > 0) {
+        Array.from(validatedData.images).forEach(file => {
           if (file instanceof File) {
             formData.append('images', file);
-            console.log('Appending new file:', file.name);
           }
         });
       } else {
@@ -262,26 +256,25 @@ const handleSubmit = async (event) => {
         }
       }
 
-      console.log('Sending update request for team:', formState._id);
-      
       const response = await axios.put(
         `http://localhost:8000/api/v1/team/${formState._id}`,
         formData,
         {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { 
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          },
           timeout: 60000 
         }
       );
 
-      console.log('Update successful:', response.data);
-
-      // Update local state with returned images
       const updatedTeam = response.data.data;
       setApiData(prevData =>
         prevData.map(t => (t._id === updatedTeam._id ? updatedTeam : t))
       );
 
       setEditModal(false);
+      alert('Team updated successfully!');
       
       setTimeout(() => {
         window.location.reload();
@@ -289,18 +282,41 @@ const handleSubmit = async (event) => {
       
     } catch (error) {
       console.error('Error updating team:', error);
-      console.error('Error response:', error.response?.data);
-      alert('Failed to update team: ' + (error.response?.data?.message || error.message));
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to update team: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
-  const handleDelete = (id) => {
-    axios.delete(`http://localhost:8000/api/v1/team/${id}`);
-    setApiData((prevData) => prevData.filter((data) => data._id !== id));
-    setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+  const handleDelete = async (id) => {
+    if (!token) {
+      alert('Please log in to delete teams');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `http://localhost:8000/api/v1/team/${id}`,
+        getAxiosConfig()
+      );
+      setApiData((prevData) => prevData.filter((data) => data._id !== id));
+      setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+      alert('Team deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to delete team: ' + (error.response?.data?.message || error.message));
+      }
+    }
   };
 
-  // Auto-open sidebar on desktop
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 992) {
@@ -316,6 +332,8 @@ const handleSubmit = async (event) => {
   }, []);
 
   useEffect(() => {
+    if (!token) return;
+
     const fetchTeams = async () => {
       try {
         setLoading(true);
@@ -336,7 +354,7 @@ const handleSubmit = async (event) => {
     };
 
     fetchTeams();
-  }, [page, limit]);
+  }, [page, limit, token]);
 
   useEffect(() => {
     if (apiData.length > 0) {
@@ -353,7 +371,6 @@ const handleSubmit = async (event) => {
     }
   }, [apiData]);
 
-  // Search filter
   useEffect(() => {
     if (searchTerm) {
       const filtered = flattenData.filter(team => 
@@ -367,7 +384,6 @@ const handleSubmit = async (event) => {
     }
   }, [searchTerm, flattenData]);
 
-  // Export to CSV
   const exportToCSV = () => {
     const csvData = filteredData.map(team => ({
       'Team ID': team.id,
@@ -390,7 +406,6 @@ const handleSubmit = async (event) => {
     alert('Teams exported to CSV');
   };
 
-  // Export to PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
     
@@ -430,7 +445,6 @@ const handleSubmit = async (event) => {
     });
   };
 
-  // SELECT ALL functionality
   const handleSelectAll = (isChecked) => {
     setSelectAll(isChecked);
     if (isChecked) {
@@ -441,14 +455,13 @@ const handleSubmit = async (event) => {
     }
   };
 
-  // Update selectAll state when individual checkboxes change
   useEffect(() => {
     if (flattenData.length > 0) {
       setSelectAll(checkedId.length === flattenData.length);
     }
   }, [checkedId, flattenData]);
 
-  const bulkDelete = () => {
+  const bulkDelete = async () => {
     if (checkedId.length === 0) {
       alert('Please select at least one team to delete');
       return;
@@ -456,9 +469,9 @@ const handleSubmit = async (event) => {
 
     if (window.confirm(`Are you sure you want to delete ${checkedId.length} team(s)?`)) {
       try {
-        checkedId.forEach((id) => {
-          handleDelete(id);
-        });
+        for (const id of checkedId) {
+          await handleDelete(id);
+        }
         setCheckedId([]);
         setSelectAll(false);
       } catch (e) {
@@ -478,16 +491,14 @@ const handleSubmit = async (event) => {
         placeholder: 'Enter Team Name',
         className: 'input-field',
         value: formState.name,
-        onChange: (e) => setFormState({ ...formState, name: e.target.value }),
         required: true,
       },
       {
         label: 'Description',
-        type: 'text',
+        type: 'textarea',
         name: 'description',
         placeholder: 'Enter Description',
         value: formState.description,
-        onChange: (e) => setFormState({ ...formState, description: e.target.value }),
         required: true,
       },
       {
@@ -495,7 +506,6 @@ const handleSubmit = async (event) => {
         type: 'file',
         name: 'images',
         id: 'custom_file',
-        onChange: (e) => onChange(e),
         required: false,
         multiple: true,
       },
@@ -504,13 +514,13 @@ const handleSubmit = async (event) => {
 
   if (loading) return <div>Loading teams...</div>;
   if (error) return <div>Error: {error}</div>;
+  if (!user) return <div>Checking authentication...</div>;
 
   return (
     <>
       <MetaData title={'Teams Management'} />
 
       <div className="admin-layout">
-        {/* Hamburger menu button */}
         <button
           className="sidebar-toggle-btn"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -518,17 +528,14 @@ const handleSubmit = async (event) => {
           <i className="fa fa-bars"></i>
         </button>
 
-        {/* Sidebar */}
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} user={user} />
 
-        {/* Main Content */}
         <div className={`admin-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
           <div className="container-fluid">
             <h1 className="my-4">Teams Management</h1>
 
             <div className="main-container__admin">
               <div className="container sub-container__single-lg">
-                {/* Search and Export */}
                 <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', padding: '20px 20px 0 20px' }}>
                   <TextField
                     size="small"
@@ -594,6 +601,7 @@ const handleSubmit = async (event) => {
                                 loadEditModal={loadDataByIdEdit}
                                 loadInfoModal={loadDataByIdInfo}
                                 deleteTeam={handleDelete}
+                                isAdmin={user?.role === 'admin'}
                               />
                             ))
                           ) : (
@@ -615,7 +623,6 @@ const handleSubmit = async (event) => {
                     flexDirection: 'column',
                     gap: 2,
                   }}>
-                    {/* Action Buttons Row */}
                     <Box sx={{
                       display: 'flex',
                       justifyContent: 'flex-start',
@@ -657,7 +664,6 @@ const handleSubmit = async (event) => {
                       </Button>
                     </Box>
 
-                    {/* Pagination Row */}
                     <Box sx={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -665,7 +671,6 @@ const handleSubmit = async (event) => {
                       flexWrap: 'wrap',
                       gap: 2
                     }}>
-                      {/* Left side - Page Size & Total */}
                       <Box sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -694,7 +699,6 @@ const handleSubmit = async (event) => {
                         </Typography>
                       </Box>
 
-                      {/* Right side - Pagination Controls */}
                       <Box sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -747,7 +751,6 @@ const handleSubmit = async (event) => {
         </div>
       </div>
 
-      {/* Modals - Moved outside of container to ensure proper rendering */}
       <CSSTransition
         in={openModal}
         timeout={300}
@@ -762,6 +765,7 @@ const handleSubmit = async (event) => {
           handleSubmit={handleSubmit}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
+          validationSchema={teamSchema}
         />
       </CSSTransition>
 
@@ -780,6 +784,7 @@ const handleSubmit = async (event) => {
           formState={formState}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
+          validationSchema={teamEditSchema}
         />
       </CSSTransition>
 
@@ -802,7 +807,7 @@ const handleSubmit = async (event) => {
 }
 
 function Row(props) {
-  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteTeam } = props;
+  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteTeam, isAdmin } = props;
   const [open, setOpen] = useState(false);
 
   return (
@@ -818,11 +823,13 @@ function Row(props) {
           </IconButton>
         </TableCell>
         <TableCell align="center">
-          <Checkbox
-            checked={isChecked}
-            onChange={(e) => handleCheck(row.id, e.target.checked)}
-            inputProps={{ 'aria-label': 'controlled' }}
-          />
+          {isAdmin && (
+            <Checkbox
+              checked={isChecked}
+              onChange={(e) => handleCheck(row.id, e.target.checked)}
+              inputProps={{ 'aria-label': 'controlled' }}
+            />
+          )}
         </TableCell>
         <TableCell component="th" scope="row" sx={{ minWidth: '400px' }}>
           {row.id}
@@ -862,24 +869,28 @@ function Row(props) {
               </Box>
             </Box>
             <div className="collapsible-table__controls">
-              <Button
-                className='collapsible-control__item delete'
-                variant="contained"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this team?')) {
-                    deleteTeam(row.id);
-                  }
-                }}
-              >
-                Delete
-              </Button>
-              <Button
-                className='collapsible-control__item update'
-                variant="contained"
-                onClick={() => loadEditModal(row.id)}
-              >
-                Update
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    className='collapsible-control__item delete'
+                    variant="contained"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this team?')) {
+                        deleteTeam(row.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    className='collapsible-control__item update'
+                    variant="contained"
+                    onClick={() => loadEditModal(row.id)}
+                  >
+                    Update
+                  </Button>
+                </>
+              )}
               <Button
                 className='collapsible-control__item info'
                 variant="contained"

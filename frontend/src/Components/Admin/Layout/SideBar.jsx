@@ -1,12 +1,31 @@
+// src/Admin/Layout/SideBar.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { logout } from '../../Utils/helpers';
+import { logout, getUser, isAdmin } from '../../Utils/helpers';
 import '../../../Styles/sidebar.css';
 
-const Sidebar = ({ isOpen, setIsOpen }) => {
+const Sidebar = ({ isOpen, setIsOpen, user: propUser }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [expandedMenus, setExpandedMenus] = useState({ crud: false });
+  const [user, setUser] = useState(propUser || {});
+
+  // Update user when prop changes or on mount
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+    } else {
+      const currentUser = getUser();
+      setUser(currentUser || {});
+    }
+  }, [propUser]);
+
+  // Check if user is admin, redirect if not
+  useEffect(() => {
+    if (!isAdmin()) {
+      navigate('/');
+    }
+  }, [navigate]);
 
   const isActive = (path) => location.pathname === path;
 
@@ -22,56 +41,67 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   }, [location.pathname]);
 
   const handleLinkClick = () => {
-    if (window.innerWidth <= 992) setIsOpen(false);
+    // Close sidebar on mobile after clicking a link
+    if (window.innerWidth <= 992) {
+      setIsOpen(false);
+    }
   };
 
-  const handleLogout = async (e) => {
+  const handleLogout = (e) => {
     e.preventDefault();
     
-    try {
-      // Call the logout helper function
-      await logout();
+    logout(() => {
+      // Clear any remaining storage
+      localStorage.clear();
+      sessionStorage.clear();
       
-      // Clear all possible authentication data
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
-      
-      // Clear cookies if you're using them
+      // Clear all cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
       
-      // Redirect to home page
+      // Redirect to home
       window.location.href = '/';
-      // Alternative: navigate('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Force logout even if there's an error
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/';
-    }
+    });
   };
+
+  // Don't render sidebar if not admin
+  if (!isAdmin()) {
+    return null;
+  }
 
   return (
     <>
-      {isOpen && <div className="sidebar-overlay" onClick={() => setIsOpen(false)} />}
+      {/* Overlay - show when sidebar is open */}
+      {isOpen && (
+        <div 
+          className={`sidebar-overlay ${isOpen ? 'show' : ''}`}
+          onClick={() => setIsOpen(false)} 
+        />
+      )}
 
       <div className={`sidebar-wrapper ${isOpen ? 'open' : ''}`}>
         <nav id="sidebar">
           <div className="sidebar-header">
-            <h3>Admin Panel</h3>
-            <button className="close-btn" onClick={() => setIsOpen(false)}>
-              <i className="fa fa-times"></i>
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div>
+                <h3>Admin Panel</h3>
+                {user && user.first_name && (
+                  <p className="sidebar-user-info">
+                    Welcome, {user.first_name} {user.last_name}
+                  </p>
+                )}
+              </div>
+              <button className="close-btn" onClick={() => setIsOpen(false)}>
+                <i className="fa fa-times"></i>
+              </button>
+            </div>
           </div>
 
           <ul className="list-unstyled components">
-             {/* Dashboard */}
+            {/* Dashboard */}
             <li className={isActive('/dashboard') ? 'active' : ''}>
               <Link to="/dashboard" onClick={handleLinkClick}>
                 <i className="fa fa-tachometer"></i> Dashboard
@@ -134,6 +164,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <li className={isActive('/admin/reviews') ? 'active' : ''}>
               <Link to="/admin/reviews" onClick={handleLinkClick}>
                 <i className="fa fa-star"></i> Reviews
+              </Link>
+            </li>
+
+            {/* Admin Profile */}
+            <li className={isActive('/me') ? 'active' : ''}>
+              <Link to="/me" onClick={handleLinkClick}>
+                <i className="fa fa-user-circle"></i> My Profile
               </Link>
             </li>
 

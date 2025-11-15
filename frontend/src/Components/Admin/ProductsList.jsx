@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import "primereact/resources/themes/lara-light-cyan/theme.css";
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { getToken, getUser, isAdmin } from '../Utils/helpers';
 
 // Icons and Imported Components
 import Button from '@mui/material/Button';
 import { CSSTransition } from 'react-transition-group';
+import { productSchema, productEditSchema } from '../Utils/validationSchema';
 
 // Modals
 import EditModal from "./Layout/EditModal";
@@ -43,9 +46,14 @@ import Sidebar from './Layout/SideBar';
 import MetaData from '../Layout/MetaData';
 
 const ProductList = () => {
+  const navigate = useNavigate();
   const createRef = useRef(null);
   const editRef = useRef(null);
   const infoRef = useRef(null);
+
+  // User and Auth
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
   // CRUD Necessities
   const [apiData, setApiData] = useState([]);
@@ -61,17 +69,16 @@ const ProductList = () => {
   const [checkedId, setCheckedId] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [formState, setFormState] = useState({
-  _id: '',
-  name: '',
-  price: '',
-  description: '',
-  category: '',
-  team: '',
-  stock: '',
-  images: [],
-  existingImages: []
-});
-
+    _id: '',
+    name: '',
+    price: '',
+    description: '',
+    category: '',
+    team: '',
+    stock: '',
+    images: [],
+    existingImages: []
+  });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -86,11 +93,37 @@ const ProductList = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [filteredData, setFilteredData] = useState([]);
 
+  // Check authentication on mount
+  useEffect(() => {
+    const currentUser = getUser();
+    const currentToken = getToken();
+    
+    if (!currentUser || !currentToken) {
+      navigate('/login');
+      return;
+    }
+
+    if (currentUser.role !== 'admin') {
+      navigate('/');
+      return;
+    }
+
+    setUser(currentUser);
+    setToken(currentToken);
+  }, [navigate]);
+
+  // Get axios config with auth header
+  const getAxiosConfig = () => ({
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
   const onChange = e => {
     const files = Array.from(e.target.files);
-    
+
     if (files.length === 0) return;
-    
+
     setImagesPreview([]);
 
     const fileObjects = [];
@@ -118,7 +151,7 @@ const ProductList = () => {
   }
 
   const resetFormstate = () => {
-    setFormState({ 
+    setFormState({
       _id: '',
       name: '',
       price: '',
@@ -139,8 +172,9 @@ const ProductList = () => {
 
   const loadDataGen = async (id) => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/v1/product/${id}`);
-      const productData = response.data.data; 
+      const response = await axios.get(`http://localhost:8000/api/v1/product/${id}`, getAxiosConfig());
+      const productData = response.data.data;
+      
       setFormState({
         _id: id,
         name: productData.name,
@@ -159,7 +193,13 @@ const ProductList = () => {
       return productData;
     } catch (error) {
       console.error('Error loading product data:', error);
-      alert('Failed to load product data');
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to load product data');
+      }
     }
   }
 
@@ -172,181 +212,190 @@ const ProductList = () => {
   const loadDataByIdInfo = async (id) => {
     resetFormstate();
     const productData = await loadDataGen(id);
-    
+
     setFormState(prev => ({
-        ...prev,
-        images: productData.images || [],
-        existingImages: []
+      ...prev,
+      images: productData.images || [],
+      existingImages: []
     }));
-    
+
     setInfoModal(true);
   }
 
-  const handleSubmit = async (event) => {
-  event.preventDefault();
-  
-  if (!formState.name || !formState.description || !formState.category || !formState.team || !formState.stock) {
-    alert('Please fill in all required fields');
-    return;
-  }
-  
-  const priceValue = parseFloat(formState.price);
-  if (isNaN(priceValue) || priceValue < 0) {
-    alert('Please enter a valid price.');
-    return;
-  }
-  
-  const stockValue = parseInt(formState.stock);
-  if (isNaN(stockValue) || stockValue < 0) {
-    alert('Please enter a valid stock quantity (must be 0 or greater)');
-    return;
-  }
-  
-  if (!formState.images || formState.images.length === 0) {
-    alert('Please upload at least one product image');
-    return;
-  }
-  
-  try {
-    const base64Images = await Promise.all(
-      formState.images.map(file => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      })
-    );
-
-    const productData = {
-      name: formState.name.trim(),
-      price: priceValue,
-      description: formState.description.trim(),
-      category: formState.category,
-      team: formState.team, 
-      stock: stockValue,
-      images: base64Images
-    };
-
-    console.log('Sending product data:', productData);
-
-    const response = await axios.post('http://localhost:8000/api/v1/product/', productData, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
-
-    if (response.data.success) {
-      alert('Product created successfully!');
-      setOpenModal(false);
-      resetFormstate();
-      fetchProducts();
+  const handleSubmit = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to create products');
+      navigate('/login');
+      return;
     }
-  } catch (error) {
-    console.error('Error creating product:', error);
-    console.error('Error response:', error.response?.data);
-    
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to create product';
-    alert('Failed to create product: ' + errorMessage);
-  }
-};
 
-  const handleUpdate = async () => {
-  const priceValue = parseFloat(formState.price);
-  if (isNaN(priceValue) || priceValue < 0) {
-    alert('Please enter a valid price.');
-    return;
-  }
-  
-  try {
-    let imagesToSend = formState.existingImages;
-
-    if (formState.images && formState.images.length > 0) {
+    try {
       const base64Images = await Promise.all(
-        formState.images.map(file => {
-          return new Promise((resolve) => {
+        Array.from(validatedData.images).map(file => {
+          return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
             reader.readAsDataURL(file);
           });
         })
       );
-      imagesToSend = base64Images;
-    }
 
-    const productData = {
-      name: formState.name,
-      price: priceValue, 
-      description: formState.description,
-      category: formState.category,
-      team: formState.team,
-      stock: parseInt(formState.stock),
-      images: imagesToSend
-    };
+      const productData = {
+        name: validatedData.name.trim(),
+        price: parseFloat(validatedData.price),
+        description: validatedData.description.trim(),
+        category: validatedData.category,
+        team: validatedData.team,
+        stock: parseInt(validatedData.stock),
+        images: base64Images
+      };
 
-    console.log('Updating product with data:', productData); 
+      console.log('Sending product data:', productData);
 
-    const response = await axios.put(
-      `http://localhost:8000/api/v1/product/${formState._id}`,
-      productData,
-      {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 60000
-      }
-    );
-
-    if (response.data.success) {
-      alert('Product updated successfully!');
-      setEditModal(false);
-      resetFormstate();
-      fetchProducts();
-    }
-    
-  } catch (error) {
-    console.error('Error updating product:', error);
-    console.error('Error response:', error.response?.data); 
-    alert('Failed to update product: ' + (error.response?.data?.message || error.message));
-  }
-};
-
-  const handleDelete = async (id) => {
-  try {
-    const response = await axios.delete(`http://localhost:8000/api/v1/product/${id}`);
-    if (response.data.success) {
-      setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
-      
-      setApiData((prevData) => prevData.filter((product) => product._id !== id));
-      setFlattenData((prevData) => prevData.filter((product) => product.id !== id));
-      
-      setTotal((prevTotal) => prevTotal - 1);
-      
-      setTotalPages((prevPages) => {
-        const newTotal = total - 1;
-        const newPages = Math.ceil(newTotal / limit);
-        
-        if (page > newPages && newPages > 0) {
-          setPage(newPages);
-        }
-        
-        return newPages;
+      const response = await axios.post('http://localhost:8000/api/v1/product/', productData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 30000,
       });
-      
-      alert('Product deleted successfully!');
-      
-      if (flattenData.length === 1 && page > 1) {
-        setPage(prev => prev - 1);
-      } else {
+
+      if (response.data.success) {
+        alert('Product created successfully!');
+        setOpenModal(false);
+        resetFormstate();
         fetchProducts();
       }
+    } catch (error) {
+      console.error('Error creating product:', error);
+      console.error('Error response:', error.response?.data);
+
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to create product';
+        alert('Failed to create product: ' + errorMessage);
+      }
     }
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to delete product';
-    alert('Failed to delete product: ' + errorMessage);
-  }
-};
+  };
+
+ const handleUpdate = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to update products');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const priceValue = parseFloat(validatedData.price);
+
+      const productData = {
+        name: validatedData.name,
+        price: priceValue,
+        description: validatedData.description,
+        category: validatedData.category,
+        team: validatedData.team,
+        stock: parseInt(validatedData.stock)
+      };
+
+      // Only include images if new ones were provided
+      if (validatedData.images && validatedData.images.length > 0) {
+        console.log('New images provided, replacing existing images');
+        productData.images = validatedData.images;
+      } else {
+        console.log('No new images provided, keeping existing images');
+        // Send existing images to maintain them
+        productData.images = formState.existingImages;
+      }
+
+      console.log('Updating product with data:', productData);
+
+      const response = await axios.put(
+        `http://localhost:8000/api/v1/product/${formState._id}`,
+        productData,
+        {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          timeout: 60000
+        }
+      );
+
+      if (response.data.success) {
+        alert('Product updated successfully!');
+        setEditModal(false);
+        resetFormstate();
+        fetchProducts();
+      }
+
+    } catch (error) {
+      console.error('Error updating product:', error);
+      console.error('Error response:', error.response?.data);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to update product: ' + (error.response?.data?.message || error.message));
+      }
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!token) {
+      alert('Please log in to delete products');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const response = await axios.delete(
+        `http://localhost:8000/api/v1/product/${id}`,
+        getAxiosConfig()
+      );
+      
+      if (response.data.success) {
+        setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+
+        setApiData((prevData) => prevData.filter((product) => product._id !== id));
+        setFlattenData((prevData) => prevData.filter((product) => product.id !== id));
+
+        setTotal((prevTotal) => prevTotal - 1);
+
+        setTotalPages((prevPages) => {
+          const newTotal = total - 1;
+          const newPages = Math.ceil(newTotal / limit);
+
+          if (page > newPages && newPages > 0) {
+            setPage(newPages);
+          }
+
+          return newPages;
+        });
+
+        alert('Product deleted successfully!');
+
+        if (flattenData.length === 1 && page > 1) {
+          setPage(prev => prev - 1);
+        } else {
+          fetchProducts();
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to delete product';
+        alert('Failed to delete product: ' + errorMessage);
+      }
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -364,6 +413,8 @@ const ProductList = () => {
 
   // Fetch categories and teams
   useEffect(() => {
+    if (!token) return;
+
     const fetchCategoriesAndTeams = async () => {
       try {
         const [categoriesRes, teamsRes] = await Promise.all([
@@ -383,17 +434,19 @@ const ProductList = () => {
     };
 
     fetchCategoriesAndTeams();
-  }, []);
+  }, [token]);
 
   // Fetch products function
   const fetchProducts = async () => {
+    if (!token) return;
+
     try {
       setLoading(true);
       const response = await axios.get(`http://localhost:8000/api/v1/product?page=${page}&limit=${limit}`);
-      
+
       if (response.data.success) {
         const products = response.data.data;
-        
+
         // Fetch reviews for each product to calculate accurate ratings
         const productsWithReviews = await Promise.all(
           products.map(async (product) => {
@@ -403,13 +456,13 @@ const ProductList = () => {
                 const productReviews = reviewsResponse.data.data.filter(
                   review => review.product?._id === product._id
                 );
-                
+
                 // Calculate average rating
                 const totalRating = productReviews.reduce((sum, review) => sum + review.rating, 0);
-                const averageRating = productReviews.length > 0 
-                  ? (totalRating / productReviews.length).toFixed(1) 
+                const averageRating = productReviews.length > 0
+                  ? (totalRating / productReviews.length).toFixed(1)
                   : 0;
-                
+
                 return {
                   ...product,
                   ratings: parseFloat(averageRating),
@@ -423,7 +476,7 @@ const ProductList = () => {
             }
           })
         );
-        
+
         setApiData(productsWithReviews);
         setTotal(response.data.pagination?.total || productsWithReviews.length);
         setTotalPages(response.data.pagination?.pages || Math.ceil(productsWithReviews.length / limit));
@@ -440,8 +493,10 @@ const ProductList = () => {
 
   // Fetch products on mount and when page/limit changes
   useEffect(() => {
-    fetchProducts();
-  }, [page, limit]);
+    if (token) {
+      fetchProducts();
+    }
+  }, [page, limit, token]);
 
   useEffect(() => {
     if (apiData.length > 0) {
@@ -468,15 +523,15 @@ const ProductList = () => {
   // Search and Category filter
   useEffect(() => {
     let filtered = [...flattenData];
-    
+
     // Apply category filter
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(product => product.categoryId === categoryFilter);
     }
-    
+
     // Apply search
     if (searchTerm) {
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -484,7 +539,7 @@ const ProductList = () => {
         product.id.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     setFilteredData(filtered);
   }, [searchTerm, categoryFilter, flattenData]);
 
@@ -518,14 +573,14 @@ const ProductList = () => {
   // Export to PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
-    
+
     doc.setFontSize(18);
     doc.text('Products Report', 14, 22);
-    
+
     doc.setFontSize(11);
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
     doc.text(`Total Products: ${filteredData.length}`, 14, 36);
-    
+
     const tableData = filteredData.map(product => [
       product.id.substring(0, 8) + '...',
       product.name.substring(0, 20),
@@ -534,7 +589,7 @@ const ProductList = () => {
       product.stock,
       product.ratings
     ]);
-    
+
     autoTable(doc, {
       head: [['Product ID', 'Name', 'Price', 'Category', 'Stock', 'Rating']],
       body: tableData,
@@ -542,7 +597,7 @@ const ProductList = () => {
       styles: { fontSize: 8 },
       headStyles: { fillColor: [198, 40, 40] }
     });
-    
+
     doc.save(`products_${new Date().toISOString().split('T')[0]}.pdf`);
     alert('Products exported to PDF');
   };
@@ -574,55 +629,67 @@ const ProductList = () => {
   }, [checkedId, flattenData]);
 
   const bulkDelete = async () => {
-  if (checkedId.length === 0) {
-    alert('Please select at least one product to delete');
-    return;
-  }
-
-  if (window.confirm(`Are you sure you want to delete ${checkedId.length} product(s)?`)) {
-    try {
-      const deleteCount = checkedId.length;
-      
-      // Delete all selected products
-      const deletePromises = checkedId.map(id => 
-        axios.delete(`http://localhost:8000/api/v1/product/${id}`)
-      );
-      
-      await Promise.all(deletePromises);
-      
-      // Update local state immediately
-      setApiData((prevData) => 
-        prevData.filter((product) => !checkedId.includes(product._id))
-      );
-      setFlattenData((prevData) => 
-        prevData.filter((product) => !checkedId.includes(product.id))
-      );
-      
-      // Clear selections
-      setCheckedId([]);
-      setSelectAll(false);
-      
-      setTotal((prevTotal) => prevTotal - deleteCount);
-      
-      const newTotal = total - deleteCount;
-      const newPages = Math.ceil(newTotal / limit);
-      setTotalPages(newPages);
-      
-      if (page > newPages && newPages > 0) {
-        setPage(newPages);
-      }
-      
-      alert(`Successfully deleted ${deleteCount} product(s)!`);
-      
-      fetchProducts();
-      
-    } catch (error) {
-      console.error('Bulk delete error:', error);
-      alert('Some products failed to delete. Please try again.');
-      fetchProducts();
+    if (checkedId.length === 0) {
+      alert('Please select at least one product to delete');
+      return;
     }
-  }
-};
+
+    if (!token) {
+      alert('Please log in to delete products');
+      navigate('/login');
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${checkedId.length} product(s)?`)) {
+      try {
+        const deleteCount = checkedId.length;
+
+        // Delete all selected products
+        const deletePromises = checkedId.map(id =>
+          axios.delete(`http://localhost:8000/api/v1/product/${id}`, getAxiosConfig())
+        );
+
+        await Promise.all(deletePromises);
+
+        // Update local state immediately
+        setApiData((prevData) =>
+          prevData.filter((product) => !checkedId.includes(product._id))
+        );
+        setFlattenData((prevData) =>
+          prevData.filter((product) => !checkedId.includes(product.id))
+        );
+
+        // Clear selections
+        setCheckedId([]);
+        setSelectAll(false);
+
+        setTotal((prevTotal) => prevTotal - deleteCount);
+
+        const newTotal = total - deleteCount;
+        const newPages = Math.ceil(newTotal / limit);
+        setTotalPages(newPages);
+
+        if (page > newPages && newPages > 0) {
+          setPage(newPages);
+        }
+
+        alert(`Successfully deleted ${deleteCount} product(s)!`);
+
+        fetchProducts();
+
+      } catch (error) {
+        console.error('Bulk delete error:', error);
+        
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          alert('Unauthorized. Please log in as admin.');
+          navigate('/login');
+        } else {
+          alert('Some products failed to delete. Please try again.');
+        }
+        fetchProducts();
+      }
+    }
+  };
 
   const modalData = {
     title: 'Product',
@@ -635,24 +702,17 @@ const ProductList = () => {
         placeholder: 'Enter Product Name',
         className: 'input-field',
         value: formState.name,
-        onChange: (e) => setFormState({ ...formState, name: e.target.value }),
         required: true,
       },
       {
         label: 'Price',
-        type: 'text',
+        type: 'number',
         name: 'price',
         placeholder: 'Enter Price',
         value: formState.price,
-        onChange: (e) => {
-    const value = e.target.value;
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      const numValue = value === '' ? '' : parseFloat(value);
-      if (value === '' || (numValue >= 0) || value.endsWith('.')) {
-        setFormState({ ...formState, price: value });
-      }
-    }
-  },
+        required: true,
+        min: 0,
+        step: '0.01'
       },
       {
         label: 'Description',
@@ -660,7 +720,6 @@ const ProductList = () => {
         name: 'description',
         placeholder: 'Enter Description',
         value: formState.description,
-        onChange: (e) => setFormState({ ...formState, description: e.target.value }),
         required: true,
       },
       {
@@ -668,7 +727,6 @@ const ProductList = () => {
         type: 'select',
         name: 'category',
         value: formState.category,
-        onChange: (e) => setFormState({ ...formState, category: e.target.value }),
         required: true,
         options: categories.map(cat => ({ value: cat._id, label: cat.name }))
       },
@@ -677,7 +735,6 @@ const ProductList = () => {
         type: 'select',
         name: 'team',
         value: formState.team,
-        onChange: (e) => setFormState({ ...formState, team: e.target.value }),
         required: true,
         options: teams.map(team => ({ value: team._id, label: team.name }))
       },
@@ -687,21 +744,14 @@ const ProductList = () => {
         name: 'stock',
         placeholder: 'Enter Stock Quantity',
         value: formState.stock,
-        onChange: (e) => {
-    const value = e.target.value;
-    if (value === '' || /^\d+$/.test(value)) {
-      setFormState({ ...formState, stock: value });
-    }
-  },
-  required: true,
-  min: 0,
+        required: true,
+        min: 0,
       },
       {
         label: 'Images',
         type: 'file',
         name: 'images',
         id: 'custom_file',
-        onChange: (e) => onChange(e),
         required: false,
         multiple: true,
       },
@@ -710,6 +760,7 @@ const ProductList = () => {
 
   if (loading) return <div>Loading products...</div>;
   if (error) return <div>Error: {error}</div>;
+  if (!user) return <div>Checking authentication...</div>;
 
   return (
     <>
@@ -723,7 +774,7 @@ const ProductList = () => {
           <i className="fa fa-bars"></i>
         </button>
 
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} user={user} />
 
         <div className={`admin-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
           <div className="container-fluid">
@@ -743,7 +794,7 @@ const ProductList = () => {
                       startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                     }}
                   />
-                  
+
                   <FormControl size="small" sx={{ minWidth: 180 }}>
                     <InputLabel>Category Filter</InputLabel>
                     <Select
@@ -757,7 +808,7 @@ const ProductList = () => {
                       ))}
                     </Select>
                   </FormControl>
-                  
+
                   <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
                     <Button
                       variant="outlined"
@@ -814,6 +865,7 @@ const ProductList = () => {
                                 loadEditModal={loadDataByIdEdit}
                                 loadInfoModal={loadDataByIdInfo}
                                 deleteProduct={handleDelete}
+                                isAdmin={user?.role === 'admin'}
                               />
                             ))
                           ) : (
@@ -980,6 +1032,7 @@ const ProductList = () => {
           handleSubmit={handleSubmit}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
+          validationSchema={productSchema}
         />
       </CSSTransition>
 
@@ -998,7 +1051,7 @@ const ProductList = () => {
           formState={formState}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
-          existingImages={formState.existingImages}
+          validationSchema={productEditSchema}
         />
       </CSSTransition>
 
@@ -1023,7 +1076,7 @@ const ProductList = () => {
 }
 
 function Row(props) {
-  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteProduct } = props;
+  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteProduct, isAdmin } = props;
   const [open, setOpen] = useState(false);
 
   return (
@@ -1039,11 +1092,13 @@ function Row(props) {
           </IconButton>
         </TableCell>
         <TableCell align="center">
-          <Checkbox
-            checked={isChecked}
-            onChange={(e) => handleCheck(row.id, e.target.checked)}
-            inputProps={{ 'aria-label': 'controlled' }}
-          />
+          {isAdmin && (
+            <Checkbox
+              checked={isChecked}
+              onChange={(e) => handleCheck(row.id, e.target.checked)}
+              inputProps={{ 'aria-label': 'controlled' }}
+            />
+          )}
         </TableCell>
         <TableCell component="th" scope="row" sx={{ minWidth: '300px' }}>
           {row.id}
@@ -1073,7 +1128,7 @@ function Row(props) {
                 <Typography variant="body2"><strong>Description:</strong> {row.description}</Typography>
                 <Typography variant="body2"><strong>Created At:</strong> {row.createdAt}</Typography>
                 <Typography variant="body2">
-                  <strong>Rating:</strong> {row.ratings > 0 ? `${row.ratings} / 5.0` : 'No ratings yet'} 
+                  <strong>Rating:</strong> {row.ratings > 0 ? `${row.ratings} / 5.0` : 'No ratings yet'}
                   ({row.numOfReviews} {row.numOfReviews === 1 ? 'review' : 'reviews'})
                 </Typography>
               </Box>
@@ -1104,24 +1159,28 @@ function Row(props) {
               </Box>
             </Box>
             <div className="collapsible-table__controls">
-              <Button
-                className='collapsible-control__item delete'
-                variant="contained"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this product?')) {
-                    deleteProduct(row.id);
-                  }
-                }}
-              >
-                Delete
-              </Button>
-              <Button
-                className='collapsible-control__item update'
-                variant="contained"
-                onClick={() => loadEditModal(row.id)}
-              >
-                Update
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    className='collapsible-control__item delete'
+                    variant="contained"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this product?')) {
+                        deleteProduct(row.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    className='collapsible-control__item update'
+                    variant="contained"
+                    onClick={() => loadEditModal(row.id)}
+                  >
+                    Update
+                  </Button>
+                </>
+              )}
               <Button
                 className='collapsible-control__item info'
                 variant="contained"

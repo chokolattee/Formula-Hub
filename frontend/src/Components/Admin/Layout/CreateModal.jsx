@@ -1,26 +1,82 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import '../../../Styles/Modal.css';
 import TextField from '@mui/material/TextField';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import FormHelperText from '@mui/material/FormHelperText';
 import { Carousel } from 'react-responsive-carousel';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-import { Paper, Button } from '@mui/material';
 import { FaArrowAltCircleRight, FaArrowAltCircleLeft } from "react-icons/fa";
 
 const CreateModal = forwardRef(({
     setOpenModal, 
     modalData: { title, content, fields }, 
-    handleSubmit, 
+    handleSubmit: onSubmitHandler, 
     imagesPreview, 
-    setImagesPreview
+    setImagesPreview,
+    validationSchema
 }, ref) => {
+
+    const {
+        control,
+        handleSubmit,
+        formState: { errors },
+        setValue,
+        watch,
+        reset
+    } = useForm({
+        resolver: yupResolver(validationSchema),
+        defaultValues: fields.reduce((acc, field) => {
+            if (field.col) {
+                acc[field.name] = field.value || '';
+                acc[field.name2] = field.value2 || '';
+            } else {
+                acc[field.name] = field.value || (field.type === 'file' ? [] : '');
+            }
+            return acc;
+        }, {})
+    });
 
     const closeModals = () => {
         setImagesPreview([]);
+        reset();
         setOpenModal(false);
+    };
+
+    const onSubmit = async (data) => {
+        try {
+            await onSubmitHandler(data);
+        } catch (error) {
+            console.error('Form submission error:', error);
+        }
+    };
+
+    const handleFileChange = (e, onChange) => {
+        const files = Array.from(e.target.files);
+        
+        if (files.length === 0) return;
+        
+        setImagesPreview([]);
+        const newPreviews = [];
+
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (reader.readyState === 2) {
+                    newPreviews.push(reader.result);
+                    if (newPreviews.length === files.length) {
+                        setImagesPreview(newPreviews);
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+
+        onChange(files);
     };
 
     return (
@@ -49,96 +105,145 @@ const CreateModal = forwardRef(({
                 <h2>Create New {title}</h2>
                 <p>Fill out the following fields to create a new {content}</p>
                 <div className="main-area">
-                    <form className="crud-form" onSubmit={handleSubmit}>
+                    <form className="crud-form" onSubmit={handleSubmit(onSubmit)}>
                         {fields.map((field, index) => (
                             field.col ? (
                                 <div key={index} className="input-group-col">
                                     <div className="col">
-                                        <TextField
-                                            id={`outlined-${field.name}`}
-                                            label={field.label}
-                                            variant="outlined"
-                                            type={field.type}
+                                        <Controller
                                             name={field.name}
-                                            placeholder={field.placeholder}
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            required={field.required}
-                                            fullWidth
+                                            control={control}
+                                            render={({ field: { onChange, value } }) => (
+                                                <TextField
+                                                    id={`outlined-${field.name}`}
+                                                    label={field.label}
+                                                    variant="outlined"
+                                                    type={field.type}
+                                                    placeholder={field.placeholder}
+                                                    value={value}
+                                                    onChange={onChange}
+                                                    error={!!errors[field.name]}
+                                                    helperText={errors[field.name]?.message}
+                                                    fullWidth
+                                                />
+                                            )}
                                         />
                                     </div>
                                     <div className="col" key={field.name2}>
-                                        <TextField
-                                            id={`outlined-${field.name2}`}
-                                            label={field.label2}
-                                            variant="outlined"
-                                            type={field.type2}
+                                        <Controller
                                             name={field.name2}
-                                            placeholder={field.placeholder2}
-                                            value={field.value2}
-                                            onChange={field.onChange2}
-                                            required={field.required2}
-                                            fullWidth
+                                            control={control}
+                                            render={({ field: { onChange, value } }) => (
+                                                <TextField
+                                                    id={`outlined-${field.name2}`}
+                                                    label={field.label2}
+                                                    variant="outlined"
+                                                    type={field.type2}
+                                                    placeholder={field.placeholder2}
+                                                    value={value}
+                                                    onChange={onChange}
+                                                    error={!!errors[field.name2]}
+                                                    helperText={errors[field.name2]?.message}
+                                                    fullWidth
+                                                />
+                                            )}
                                         />
                                     </div>
                                 </div>
                             ) : field.type === 'custom' ? (
-                                // Handle custom components
                                 <div key={field.name} className="input-group">
                                     {field.customComponent}
                                 </div>
                             ) : field.type === 'select' ? (
-                                // Handle select dropdowns for Category and Team
                                 <div key={field.name} className="input-group">
-                                    <FormControl fullWidth variant="outlined" required={field.required}>
-                                        <InputLabel id={`${field.name}-label`}>{field.label}</InputLabel>
-                                        <Select
-                                            labelId={`${field.name}-label`}
-                                            id={`select-${field.name}`}
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            label={field.label}
-                                            name={field.name}
-                                        >
-                                            <MenuItem value="">
-                                                <em>Select {field.label}</em>
-                                            </MenuItem>
-                                            {field.options && field.options.map((option) => (
-                                                <MenuItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
+                                    <Controller
+                                        name={field.name}
+                                        control={control}
+                                        render={({ field: { onChange, value } }) => (
+                                            <FormControl 
+                                                fullWidth 
+                                                variant="outlined" 
+                                                error={!!errors[field.name]}
+                                            >
+                                                <InputLabel id={`${field.name}-label`}>
+                                                    {field.label}
+                                                </InputLabel>
+                                                <Select
+                                                    labelId={`${field.name}-label`}
+                                                    id={`select-${field.name}`}
+                                                    value={value}
+                                                    onChange={onChange}
+                                                    label={field.label}
+                                                >
+                                                    <MenuItem value="">
+                                                        <em>Select {field.label}</em>
+                                                    </MenuItem>
+                                                    {field.options && field.options.map((option) => (
+                                                        <MenuItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                                {errors[field.name] && (
+                                                    <FormHelperText>
+                                                        {errors[field.name]?.message}
+                                                    </FormHelperText>
+                                                )}
+                                            </FormControl>
+                                        )}
+                                    />
                                 </div>
                             ) : field.type === 'text' || field.type === 'number' || field.type === 'textarea' ? (
                                 <div key={field.name} className="input-group">
-                                    <TextField
-                                        id={`outlined-${field.name}`}
-                                        label={field.label}
-                                        variant="outlined"
-                                        type={field.type}
+                                    <Controller
                                         name={field.name}
-                                        placeholder={field.placeholder}
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        required={field.required}
-                                        className={field.className}
-                                        fullWidth
-                                        multiline={field.type === 'textarea'}
-                                        rows={field.type === 'textarea' ? 4 : 1}
+                                        control={control}
+                                        render={({ field: { onChange, value } }) => (
+                                            <TextField
+                                                id={`outlined-${field.name}`}
+                                                label={field.label}
+                                                variant="outlined"
+                                                type={field.type === 'textarea' ? 'text' : field.type}
+                                                placeholder={field.placeholder}
+                                                value={value}
+                                                onChange={onChange}
+                                                error={!!errors[field.name]}
+                                                helperText={errors[field.name]?.message}
+                                                className={field.className}
+                                                fullWidth
+                                                multiline={field.type === 'textarea'}
+                                                rows={field.type === 'textarea' ? 4 : 1}
+                                                inputProps={{
+                                                    min: field.min,
+                                                    max: field.max,
+                                                    step: field.step
+                                                }}
+                                            />
+                                        )}
                                     />
                                 </div>
                             ) : field.type === 'file' ? (
                                 <div key={field.name} className="input-group">
                                     <label>{field.label}</label>
-                                    <input
-                                        type={field.type}
+                                    <Controller
                                         name={field.name}
-                                        onChange={field.onChange}
-                                        className={field.className}
-                                        multiple
-                                        accept="image/*"
+                                        control={control}
+                                        render={({ field: { onChange, value, ...rest } }) => (
+                                            <>
+                                                <input
+                                                    type="file"
+                                                    onChange={(e) => handleFileChange(e, onChange)}
+                                                    className={field.className}
+                                                    multiple
+                                                    accept="image/*"
+                                                />
+                                                {errors[field.name] && (
+                                                    <FormHelperText error>
+                                                        {errors[field.name]?.message}
+                                                    </FormHelperText>
+                                                )}
+                                            </>
+                                        )}
                                     />
                                 </div>
                             ) : null

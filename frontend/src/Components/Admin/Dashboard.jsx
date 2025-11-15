@@ -45,6 +45,7 @@ const Dashboard = () => {
     // Chart selection for PDF export
     const [selectedCharts, setSelectedCharts] = useState({
         sales: true,
+        yearlySales: true,
         products: true,
         categories: true,
         orderStatus: true
@@ -52,12 +53,14 @@ const Dashboard = () => {
     
     // Chart refs for PDF export
     const salesChartRef = useRef(null);
+    const yearlySalesChartRef = useRef(null);
     const productsChartRef = useRef(null);
     const categoriesChartRef = useRef(null);
     const orderStatusChartRef = useRef(null);
 
     // Chart data from API
     const [monthlySalesData, setMonthlySalesData] = useState([]);
+    const [yearlySalesData, setYearlySalesData] = useState([]);
     const [topProductsData, setTopProductsData] = useState([]);
     const [categoryData, setCategoryData] = useState([]);
     const [orderStatusData, setOrderStatusData] = useState([]);
@@ -92,6 +95,7 @@ const Dashboard = () => {
                 
                 // Store the actual chart data
                 setMonthlySalesData(data.data.monthlySales || []);
+                setYearlySalesData(data.data.yearlySales || []); // NEW: Yearly sales data
                 setTopProductsData(data.data.topProducts || []);
                 setCategoryData(data.data.categoryDistribution || []);
                 setOrderStatusData(data.data.orderStatusDistribution || []);
@@ -108,6 +112,10 @@ const Dashboard = () => {
     // Chart data functions now return data from API
     const getSalesChartData = () => {
         return monthlySalesData;
+    }
+
+    const getYearlySalesChartData = () => {
+        return yearlySalesData;
     }
 
     const getMostOrderedProductsData = () => {
@@ -148,6 +156,7 @@ const Dashboard = () => {
         
         const charts = [
             { ref: salesChartRef, selected: selectedCharts.sales, title: 'Monthly Sales' },
+            { ref: yearlySalesChartRef, selected: selectedCharts.yearlySales, title: 'Yearly Sales' },
             { ref: productsChartRef, selected: selectedCharts.products, title: 'Most Ordered Products' },
             { ref: categoriesChartRef, selected: selectedCharts.categories, title: 'Product Categories' },
             { ref: orderStatusChartRef, selected: selectedCharts.orderStatus, title: 'Order Status' }
@@ -348,7 +357,11 @@ const Dashboard = () => {
                                             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                                 <FormControlLabel
                                                     control={<Checkbox checked={selectedCharts.sales} onChange={(e) => setSelectedCharts({...selectedCharts, sales: e.target.checked})} />}
-                                                    label="Sales Chart"
+                                                    label="Monthly Sales"
+                                                />
+                                                <FormControlLabel
+                                                    control={<Checkbox checked={selectedCharts.yearlySales} onChange={(e) => setSelectedCharts({...selectedCharts, yearlySales: e.target.checked})} />}
+                                                    label="Yearly Sales"
                                                 />
                                                 <FormControlLabel
                                                     control={<Checkbox checked={selectedCharts.products} onChange={(e) => setSelectedCharts({...selectedCharts, products: e.target.checked})} />}
@@ -394,6 +407,32 @@ const Dashboard = () => {
                                                         name="Sales (₱)"
                                                     />
                                                 </LineChart>
+                                            </ResponsiveContainer>
+                                        </Paper>
+                                    </div>
+
+                                    {/* Yearly Sales Chart */}
+                                    <div className="col-12 mb-4">
+                                        <Paper ref={yearlySalesChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
+                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                                Yearly Sales
+                                            </Typography>
+                                            <ResponsiveContainer width="100%" height={300}>
+                                                <BarChart data={getYearlySalesChartData()}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                                                    <XAxis dataKey="year" stroke="#fff" />
+                                                    <YAxis stroke="#fff" />
+                                                    <Tooltip 
+                                                        contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
+                                                        labelStyle={{ color: '#fff' }}
+                                                    />
+                                                    <Legend wrapperStyle={{ color: '#fff' }} />
+                                                    <Bar 
+                                                        dataKey="sales" 
+                                                        fill="#e10600" 
+                                                        name="Sales (₱)"
+                                                    />
+                                                </BarChart>
                                             </ResponsiveContainer>
                                         </Paper>
                                     </div>

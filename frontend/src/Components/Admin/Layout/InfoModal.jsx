@@ -22,7 +22,6 @@ const InfoModal = React.forwardRef(({
         setOpenModal(false)
     }
 
-    // Helper function to get display value
     const getDisplayValue = (field) => {
         if (field.type === 'select') {
             if (field.name === 'category') {

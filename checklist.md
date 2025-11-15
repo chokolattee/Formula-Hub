@@ -16,7 +16,7 @@ mp2 User functions 20pts
 mp3 review ratings 20pts 
 - [x] users who availed of the product/service can write a review and rate the product service 10pts
 - [x] users can update their own review/rating. 5pts
-admin can delete a review 5pts.
+- [x] admin can delete a review 5pts.
 
 term test lab 30pts
 - [x] completed transaction. 10pts
@@ -26,7 +26,7 @@ term test lab 30pts
 
 unit 1
 - [x] filter/mask bad words from reviews. bad-words package 10pts
-form validation on product and user forms. (product crud, user login, update profile) YUP formik React Hook Form 10pts
+- [x] form validation on product and user forms. (product crud, user login, update profile) YUP formik React Hook Form 10pts
 
 unit 2
 - [x] user interface design css 10pts
@@ -36,7 +36,7 @@ unit 2
 quiz 1 
 - [x] price filter 5pts
 - [x] category filter 5pts 
-ratings filter 5pts
+- [x] ratings filter 5pts
 
 quiz 2
 - [x] monthly sales charts. all months on the chart label. line chart 10pts 

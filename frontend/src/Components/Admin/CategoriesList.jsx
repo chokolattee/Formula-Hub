@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import "primereact/resources/themes/lara-light-cyan/theme.css";
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { getToken, getUser, isAdmin } from '../Utils/helpers';
 
 // Icons and Imported Components
 import Button from '@mui/material/Button';
@@ -10,6 +12,9 @@ import { CSSTransition } from 'react-transition-group';
 import EditModal from "./Layout/EditModal";
 import InfoModal from "./Layout/InfoModal";
 import CreateModal from "./Layout/CreateModal";
+
+// Import validation schemas
+import { categorySchema, categoryEditSchema } from '../Utils/validationSchema';
 
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
@@ -43,9 +48,14 @@ import MetaData from '../Layout/MetaData';
 import '../../Styles/admin.css'
 
 const CategoriesList = () => {
+  const navigate = useNavigate();
   const createRef = useRef(null);
   const editRef = useRef(null);
   const infoRef = useRef(null);
+
+  // User and Auth
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
   // CRUD Necessities
   const [apiData, setApiData] = useState([]);
@@ -77,6 +87,32 @@ const CategoriesList = () => {
   // Search and Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredData, setFilteredData] = useState([]);
+
+  // Check authentication on mount
+  useEffect(() => {
+    const currentUser = getUser();
+    const currentToken = getToken();
+    
+    if (!currentUser || !currentToken) {
+      navigate('/login');
+      return;
+    }
+
+    if (currentUser.role !== 'admin') {
+      navigate('/');
+      return;
+    }
+
+    setUser(currentUser);
+    setToken(currentToken);
+  }, [navigate]);
+
+  // Get axios config with auth header
+  const getAxiosConfig = () => ({
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
 
   const onChange = e => {
     const files = Array.from(e.target.files);
@@ -124,72 +160,107 @@ const CategoriesList = () => {
 
   const loadDataGen = async (id) => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/v1/category/${id}`);
-      const categoryData = response.data.data;
+      console.log('Fetching category with ID:', id);
+      const response = await axios.get(`http://localhost:8000/api/v1/admin/category/${id}`, getAxiosConfig());
+      console.log('Full API Response:', response.data);
+      
+      const categoryData = response.data.data || response.data.category || response.data;
+      
+      console.log('Extracted category data:', categoryData);
 
-      setFormState({
+      if (!categoryData) {
+        throw new Error('No category data returned from API');
+      }
+
+      const cleanFormState = {
         _id: id,
-        name: categoryData.name,
-        description: categoryData.description,
+        name: categoryData.name || '',
+        description: categoryData.description || '',
         images: [], 
-        existingImages: categoryData.images || [] 
-      });
+        existingImages: Array.isArray(categoryData.images) ? categoryData.images : []
+      };
 
-      const imagePreviews = (categoryData.images || []).map(image => image.url);
+      console.log('Setting form state:', cleanFormState);
+      setFormState(cleanFormState);
+
+      const imagePreviews = (categoryData.images || []).map(image => 
+        typeof image === 'string' ? image : (image.url || image)
+      );
+      console.log('Setting image previews:', imagePreviews);
       setImagesPreview(imagePreviews);
 
       return categoryData;
     } catch (error) {
       console.error('Error loading category data:', error);
-      alert('Failed to load category data');
+      console.error('Error response:', error.response?.data);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to load category data: ' + (error.response?.data?.message || error.message));
+      }
+      throw error;
     }
   }
 
   const loadDataByIdEdit = async (id) => {
-    resetFormstate();
-    await loadDataGen(id);
-    setEditModal(true);
+    try {
+      resetFormstate();
+      await loadDataGen(id);
+      setEditModal(true);
+    } catch (error) {
+      console.error('Failed to load category for editing:', error);
+    }
   }
 
   const loadDataByIdInfo = async (id) => {
-    resetFormstate();
-    const categoryData = await loadDataGen(id);
-    
-    setFormState(prev => ({
-        ...prev,
-        images: categoryData.images || [], 
-        existingImages: []
-    }));
-    
-    setInfoModal(true);
+    try {
+      resetFormstate();
+      const categoryData = await loadDataGen(id);
+      
+      setFormState(prev => ({
+          ...prev,
+          images: categoryData.images || [], 
+          existingImages: []
+      }));
+      
+      setInfoModal(true);
+    } catch (error) {
+      console.error('Failed to load category info:', error);
+    }
   }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    
-    if (!formState.name || !formState.description) {
-      alert('Please fill in all required fields');
+  const handleSubmit = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to create categories');
+      navigate('/login');
       return;
     }
 
     try {
-      const categoryData = {
-        name: formState.name,
-        description: formState.description,
-        images: formState.images
-      };
-
-      console.log('Sending category data:', categoryData);
-
-      const response = await axios.post('http://localhost:8000/api/v1/category', categoryData, {
+      console.log('Form data received in handleSubmit:', validatedData);
+  
+      const formData = new FormData();
+      formData.append('name', validatedData.name);
+      formData.append('description', validatedData.description);
+  
+      if (validatedData.images && validatedData.images.length > 0) {
+        Array.from(validatedData.images).forEach((file) => {
+          formData.append('images', file);
+        });
+      }
+  
+      const response = await axios.post('http://localhost:8000/api/v1/category', formData, {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         },
         timeout: 30000,
       });
-
+  
       console.log('Response:', response.data);
-
+  
       const newCategory = {
         _id: response.data.data._id,
         name: response.data.data.name,
@@ -202,73 +273,115 @@ const CategoriesList = () => {
       setApiData((prevData) => [...prevData, newCategory]);
       setOpenModal(false);
       resetFormstate();
-
+      alert('Category created successfully!');
+  
       setTimeout(() => {
         window.location.reload();
       }, 500);
     } catch (error) {
       console.error('Error creating category:', error);
       console.error('Error response:', error.response?.data);
-      alert('Failed to create category: ' + (error.response?.data?.message || error.message));
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to create category: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
-  const handleUpdate = async () => {
-    if (!formState.name || !formState.description) {
-      alert('Please fill in all required fields');
+  const handleUpdate = async (validatedData) => {
+    if (!token) {
+      alert('Please log in to update categories');
+      navigate('/login');
       return;
     }
 
     try {
-      const categoryData = {
-        name: formState.name,
-        description: formState.description,
-      };
+      const formData = new FormData();
+      formData.append('name', validatedData.name);
+      formData.append('description', validatedData.description);
 
-      // Handle images - send new ones or keep existing
-      if (formState.images && formState.images.length > 0) {
-        categoryData.images = formState.images;
-      } else if (formState.existingImages && formState.existingImages.length > 0) {
-        categoryData.images = formState.existingImages;
+      if (validatedData.images && validatedData.images.length > 0) {
+        Array.from(validatedData.images).forEach(file => {
+          if (file instanceof File) {
+            formData.append('images', file);
+          }
+        });
+      } else {
+        if (formState.existingImages && formState.existingImages.length > 0) {
+          formData.append('existingImages', JSON.stringify(formState.existingImages));
+        }
       }
-
+  
       console.log('Sending update request for category:', formState._id);
-      console.log('Update data:', categoryData);
-      
+  
       const response = await axios.put(
         `http://localhost:8000/api/v1/category/${formState._id}`,
-        categoryData,
+        formData,
         {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 60000 
+          headers: { 
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          },
+          timeout: 60000,
         }
       );
-
+  
       console.log('Update successful:', response.data);
-
-      // Update local state with returned data
+  
       const updatedCategory = response.data.data;
       setApiData(prevData =>
         prevData.map(c => (c._id === updatedCategory._id ? updatedCategory : c))
       );
-
+  
       setEditModal(false);
-      
+      resetFormstate();
+      alert('Category updated successfully!');
+  
       setTimeout(() => {
         window.location.reload();
       }, 500);
-      
+  
     } catch (error) {
       console.error('Error updating category:', error);
       console.error('Error response:', error.response?.data);
-      alert('Failed to update category: ' + (error.response?.data?.message || error.message));
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to update category: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
-  const handleDelete = (id) => {
-    axios.delete(`http://localhost:8000/api/v1/category/${id}`);
-    setApiData((prevData) => prevData.filter((data) => data._id !== id));
-    setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+  const handleDelete = async (id) => {
+    if (!token) {
+      alert('Please log in to delete categories');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `http://localhost:8000/api/v1/category/${id}`,
+        getAxiosConfig()
+      );
+      setApiData((prevData) => prevData.filter((data) => data._id !== id));
+      setCheckedId((prevChecked) => prevChecked.filter((checkedId) => checkedId !== id));
+      alert('Category deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('Unauthorized. Please log in as admin.');
+        navigate('/login');
+      } else {
+        alert('Failed to delete category: ' + (error.response?.data?.message || error.message));
+      }
+    }
   };
 
   // Auto-open sidebar on desktop
@@ -287,6 +400,8 @@ const CategoriesList = () => {
   }, []);
 
   useEffect(() => {
+    if (!token) return;
+
     const fetchCategories = async () => {
       try {
         setLoading(true);
@@ -308,7 +423,7 @@ const CategoriesList = () => {
     };
 
     fetchCategories();
-  }, [limit]);
+  }, [limit, token]);
 
   useEffect(() => {
     if (apiData.length > 0) {
@@ -424,7 +539,7 @@ const CategoriesList = () => {
     }
   }, [checkedId, flattenData]);
 
-  const bulkDelete = () => {
+  const bulkDelete = async () => {
     if (checkedId.length === 0) {
       alert('Please select at least one category to delete');
       return;
@@ -432,9 +547,9 @@ const CategoriesList = () => {
 
     if (window.confirm(`Are you sure you want to delete ${checkedId.length} category(ies)?`)) {
       try {
-        checkedId.forEach((id) => {
-          handleDelete(id);
-        });
+        for (const id of checkedId) {
+          await handleDelete(id);
+        }
         setCheckedId([]);
         setSelectAll(false);
       } catch (e) {
@@ -480,6 +595,7 @@ const CategoriesList = () => {
 
   if (loading) return <div>Loading categories...</div>;
   if (error) return <div>Error: {error}</div>;
+  if (!user) return <div>Checking authentication...</div>;
 
   return (
     <>
@@ -495,7 +611,7 @@ const CategoriesList = () => {
         </button>
 
         {/* Sidebar */}
-        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+        <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} user={user} />
 
         {/* Main Content */}
         <div className={`admin-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -570,6 +686,7 @@ const CategoriesList = () => {
                                 loadEditModal={loadDataByIdEdit}
                                 loadInfoModal={loadDataByIdInfo}
                                 deleteCategory={handleDelete}
+                                isAdmin={user?.role === 'admin'}
                               />
                             ))
                           ) : (
@@ -723,7 +840,7 @@ const CategoriesList = () => {
         </div>
       </div>
 
-      {/* Modals - Moved outside of container to ensure proper rendering */}
+      {/* Modals */}
       <CSSTransition
         in={openModal}
         timeout={300}
@@ -738,6 +855,7 @@ const CategoriesList = () => {
           handleSubmit={handleSubmit}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
+          validationSchema={categorySchema}
         />
       </CSSTransition>
 
@@ -756,6 +874,7 @@ const CategoriesList = () => {
           formState={formState}
           imagesPreview={imagesPreview}
           setImagesPreview={setImagesPreview}
+          validationSchema={categoryEditSchema}
         />
       </CSSTransition>
 
@@ -778,7 +897,7 @@ const CategoriesList = () => {
 }
 
 function Row(props) {
-  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteCategory } = props;
+  const { row, handleCheck, isChecked, loadEditModal, loadInfoModal, deleteCategory, isAdmin } = props;
   const [open, setOpen] = useState(false);
 
   return (
@@ -794,11 +913,13 @@ function Row(props) {
           </IconButton>
         </TableCell>
         <TableCell align="center">
-          <Checkbox
-            checked={isChecked}
-            onChange={(e) => handleCheck(row.id, e.target.checked)}
-            inputProps={{ 'aria-label': 'controlled' }}
-          />
+          {isAdmin && (
+            <Checkbox
+              checked={isChecked}
+              onChange={(e) => handleCheck(row.id, e.target.checked)}
+              inputProps={{ 'aria-label': 'controlled' }}
+            />
+          )}
         </TableCell>
         <TableCell component="th" scope="row" sx={{ minWidth: '300px' }}>
           {row.id}
@@ -843,24 +964,28 @@ function Row(props) {
               </Box>
             </Box>
             <div className="collapsible-table__controls">
-              <Button
-                className='collapsible-control__item delete'
-                variant="contained"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this category?')) {
-                    deleteCategory(row.id);
-                  }
-                }}
-              >
-                Delete
-              </Button>
-              <Button
-                className='collapsible-control__item update'
-                variant="contained"
-                onClick={() => loadEditModal(row.id)}
-              >
-                Update
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    className='collapsible-control__item delete'
+                    variant="contained"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this category?')) {
+                        deleteCategory(row.id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    className='collapsible-control__item update'
+                    variant="contained"
+                    onClick={() => loadEditModal(row.id)}
+                  >
+                    Update
+                  </Button>
+                </>
+              )}
               <Button
                 className='collapsible-control__item info'
                 variant="contained"

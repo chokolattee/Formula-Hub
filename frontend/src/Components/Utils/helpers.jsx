@@ -1,10 +1,8 @@
-// Utils/helpers.jsx
+import { toast } from 'react-toastify';
 
 export const authenticate = (data, next) => {
     if (typeof window !== 'undefined') {
-        // Store token as plain string, not JSON
         sessionStorage.setItem('token', data.token);
-        // Store user as JSON string
         sessionStorage.setItem('user', JSON.stringify(data.user));
     }
     next();
@@ -26,7 +24,6 @@ export const getUser = () => {
     }
 };
 
-// Remove token from session storage
 export const logout = next => {
     if (typeof window !== 'undefined') {
         sessionStorage.removeItem('token');
@@ -39,7 +36,6 @@ export const getToken = () => {
     if (typeof window !== 'undefined') {
         const token = sessionStorage.getItem('token');
         if (token && token !== 'undefined' && token !== 'null') {
-            // Return token as-is, no JSON parsing needed
             return token.trim();
         } else {
             return false;
@@ -47,9 +43,15 @@ export const getToken = () => {
     }
 };
 
+export const isAdmin = () => {
+    const user = getUser();
+    return user && user.role === 'admin';
+};
+
 export const errMsg = (message = '') => toast.error(message, {
     position: 'bottom-center'
 });
+
 export const successMsg = (message = '') => toast.success(message, {
     position: 'bottom-center'
 });

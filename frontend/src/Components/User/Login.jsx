@@ -15,11 +15,10 @@ import {
   signInWithGoogle, 
   signInWithFacebook 
 } from '../Firebase/auth';
+import { useForm } from 'react-hook-form';
 
 
 const Login = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [formActive, setFormActive] = useState('login')
@@ -30,14 +29,22 @@ const Login = () => {
 
     const redirect = location.search ? new URLSearchParams(location.search).get('redirect') : ''
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        if (name === 'email') setEmail(value);
-        if (name === 'password') setPassword(value);
-        setError('');
-    };
+    // React Hook Form setup
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+        reset,
+        clearErrors
+    } = useForm({
+        mode: 'onBlur',
+        defaultValues: {
+            email: '',
+            password: ''
+        }
+    });
 
-    const loginAttempt = async () => {
+    const loginAttempt = async (email, password) => {
         try {
             setError('')
             console.log("=== LOGIN ATTEMPT ===");
@@ -95,7 +102,7 @@ const Login = () => {
         }
     }
 
-    const registerAttempt = async () => {
+    const registerAttempt = async (email, password) => {
         try {
             setError('')
             console.log("=== REGISTER ATTEMPT ===");
@@ -108,10 +115,9 @@ const Login = () => {
             // Get token and send to backend WITH PASSWORD
             const token = await user.getIdToken();
             
-            // CRITICAL FIX: Send password to backend so MongoDB can store the same password
             const res = await axios.post("http://localhost:8000/api/v1/register", { 
                 token,
-                password  // ✅ Now sending the actual password user entered
+                password  
             });
 
             if (res.data.success) {
@@ -148,29 +154,21 @@ const Login = () => {
         }
     }
 
-    const submitHandler = async (e) => {
-        e.preventDefault();
-
-        if (!email || !password) {
-            setError("Please enter both email and password")
-            return;
-        }
-
+    const onSubmit = async (data) => {
         setLoading(true)
         
         if (formActive === 'login') {
-            const success = await loginAttempt()
+            const success = await loginAttempt(data.email, data.password)
             if (success) {
                 setTimeout(() => {
                     navigate('/');
                     window.location.reload();
                 }, 1000)
             }
-            setLoading(false)
         } else {
-            await registerAttempt()
-            setLoading(false)
+            await registerAttempt(data.email, data.password)
         }
+        
         setLoading(false)
     }
 
@@ -232,9 +230,9 @@ const Login = () => {
     }
 
     const resetForm = () => {
-        setEmail('')
-        setPassword('')
+        reset()
         setError('')
+        clearErrors()
     }
 
     const handleClose = () => {
@@ -300,19 +298,24 @@ const Login = () => {
                             </div>
 
                             <div className={`form-panel ${formActive === 'login' ? 'login-active' : 'register-active'}`}>
-                                <form onSubmit={submitHandler} className="login-form">
+                                <form onSubmit={handleSubmit(onSubmit)} className="login-form" noValidate>
                                     <div className="input-group">
                                         <TextField
                                             label="Email"
                                             variant="standard"
-                                            name="email"
                                             id="email"
                                             type="email"
-                                            value={email}
-                                            onChange={handleChange}
                                             disabled={loading}
-                                            required
                                             fullWidth
+                                            error={!!errors.email}
+                                            helperText={errors.email?.message}
+                                            {...register('email', {
+                                                required: 'Email is required',
+                                                pattern: {
+                                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                                    message: 'Invalid email address'
+                                                }
+                                            })}
                                             sx={{
                                                 "& .MuiInputLabel-root.Mui-focused": {
                                                     color: "var(--primary-color)"
@@ -331,6 +334,10 @@ const Login = () => {
                                                 "& .MuiInputLabel-root": {
                                                     color: "#333333",
                                                     fontWeight: "500"
+                                                },
+                                                "& .MuiFormHelperText-root": {
+                                                    color: "#d32f2f",
+                                                    marginLeft: 0
                                                 }
                                             }}
                                         />
@@ -339,15 +346,21 @@ const Login = () => {
                                         <TextField
                                             label="Password"
                                             variant="standard"
-                                            name="password"
                                             id="password"
                                             type="password"
-                                            placeholder='Enter your Password'
-                                            value={password}
-                                            onChange={handleChange}
                                             disabled={loading}
-                                            required
                                             fullWidth
+                                            error={!!errors.password}
+                                            helperText={errors.password?.message}
+                                            {...register('password', {
+                                                required: 'Password is required',
+                                                minLength: {
+                                                    value: formActive === 'register' ? 6 : 1,
+                                                    message: formActive === 'register' 
+                                                        ? 'Password must be at least 6 characters' 
+                                                        : 'Password is required'
+                                                }
+                                            })}
                                             sx={{
                                                 "& .MuiInputLabel-root.Mui-focused": {
                                                     color: "var(--primary-color)"
@@ -366,8 +379,13 @@ const Login = () => {
                                                 "& .MuiInputLabel-root": {
                                                     color: "#333333",
                                                     fontWeight: "500"
+                                                },
+                                                "& .MuiFormHelperText-root": {
+                                                    color: "#d32f2f",
+                                                    marginLeft: 0
                                                 }
-                                            }} />
+                                            }} 
+                                        />
                                     </div>
                                     
                                     {formActive === 'login' && (

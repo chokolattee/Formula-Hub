@@ -1,4 +1,5 @@
 import React, { Fragment, useState, useEffect, useRef } from 'react'
+import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import Loader from '../Layout/Loader'
 import MetaData from '../Layout/MetaData'
@@ -21,7 +22,6 @@ const Profile = () => {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Validate file type
         if (!file.type.startsWith('image/')) {
             toast.error('Please select an image file', {
                 position: 'bottom-center'
@@ -29,15 +29,12 @@ const Profile = () => {
             return;
         }
 
-        // Validate file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
             toast.error('Image size should be less than 5MB', {
                 position: 'bottom-center'
             });
             return;
         }
-
-        console.log("Uploading avatar...", file.name)
 
         const formData = new FormData();
         formData.append('avatar', file);
@@ -56,7 +53,6 @@ const Profile = () => {
                 toast.success('Avatar updated successfully', {
                     position: 'bottom-center'
                 });
-                // Update avatar immediately
                 if (data.user.avatar && data.user.avatar.length > 0) {
                     setAvatarUrl(data.user.avatar[0].url);
                 }
@@ -67,7 +63,6 @@ const Profile = () => {
                 });
             }
         } catch (error) {
-            console.error("Error uploading avatar:", error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to upload avatar';
             toast.error(errorMessage, {
                 position: 'bottom-center'
@@ -87,14 +82,11 @@ const Profile = () => {
         }
         try {
             const { data } = await axios.get(`http://localhost:8000/api/v1/me`, config)
-            console.log("User data:", data.user)
             setUser(data.user)
 
-            // Handle avatar - check if it's an array and has items
             if (data.user.avatar && Array.isArray(data.user.avatar) && data.user.avatar.length > 0) {
                 setAvatarUrl(data.user.avatar[0].url)
             } else {
-                // Create initials from first_name and last_name or email
                 const displayName = data.user.first_name
                     ? `${data.user.first_name} ${data.user.last_name}`.trim()
                     : data.user.email.split('@')[0];
@@ -102,7 +94,6 @@ const Profile = () => {
             }
             setLoading(false)
         } catch (error) {
-            console.log(error)
             toast.error("Failed to load profile", {
                 position: 'bottom-center'
             })
@@ -148,7 +139,6 @@ const Profile = () => {
                         </div>
                         <div className="profile-main">
                             <div className="profile-content">
-                                {/* Tab Buttons */}
                                 <div className="profile-tabs">
                                     <button
                                         className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
@@ -164,7 +154,6 @@ const Profile = () => {
                                     </button>
                                 </div>
 
-                                {/* Tab Content */}
                                 {activeTab === 'overview' ? (
                                     <AccountOverview user={user} getProfile={getProfile} />
                                 ) : (
@@ -181,35 +170,27 @@ const Profile = () => {
 
 const AccountOverview = ({ user, getProfile }) => {
     const [isEditing, setIsEditing] = useState(false);
-    const [formData, setFormData] = useState({
-        first_name: '',
-        last_name: '',
-        email: '',
-        birthday: '',
-        gender: ''
+    const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm({
+        defaultValues: {
+            first_name: '',
+            last_name: '',
+            email: '',
+            birthday: '',
+            gender: ''
+        }
     });
 
     useEffect(() => {
         if (user) {
-            setFormData({
-                first_name: user.first_name || '',
-                last_name: user.last_name || '',
-                email: user.email || '',
-                birthday: user.birthday || '',
-                gender: user.gender || ''
-            });
+            setValue('first_name', user.first_name || '');
+            setValue('last_name', user.last_name || '');
+            setValue('email', user.email || '');
+            setValue('birthday', user.birthday || '');
+            setValue('gender', user.gender || '');
         }
-    }, [user]);
+    }, [user, setValue]);
 
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const onSubmit = async (formData) => {
         const config = {
             headers: {
                 'Authorization': `Bearer ${getToken()}`
@@ -223,7 +204,6 @@ const AccountOverview = ({ user, getProfile }) => {
             setIsEditing(false);
             getProfile();
         } catch (error) {
-            console.log(error);
             toast.error(error.response?.data?.message || 'Error updating profile', {
                 position: 'bottom-center'
             });
@@ -231,7 +211,7 @@ const AccountOverview = ({ user, getProfile }) => {
     };
 
     const handleCancel = () => {
-        setFormData({
+        reset({
             first_name: user.first_name || '',
             last_name: user.last_name || '',
             email: user.email || '',
@@ -286,62 +266,104 @@ const AccountOverview = ({ user, getProfile }) => {
                     </div>
                 </div>
             ) : (
-                <form className="edit-form" onSubmit={handleSubmit}>
+                <form className="edit-form" onSubmit={handleSubmit(onSubmit)}>
                     <div className="form-group">
                         <label className="form-label">First Name</label>
                         <input
                             type="text"
-                            name="first_name"
                             className="form-input"
-                            value={formData.first_name}
-                            onChange={handleChange}
                             placeholder="Enter your first name"
+                            {...register('first_name', {
+                                minLength: {
+                                    value: 2,
+                                    message: 'First name must be at least 2 characters'
+                                },
+                                maxLength: {
+                                    value: 50,
+                                    message: 'First name must not exceed 50 characters'
+                                },
+                                pattern: {
+                                    value: /^[a-zA-Z\s'-]+$/,
+                                    message: 'First name can only contain letters, spaces, hyphens and apostrophes'
+                                }
+                            })}
                         />
+                        {errors.first_name && (
+                            <span className="error-message">{errors.first_name.message}</span>
+                        )}
                     </div>
+
                     <div className="form-group">
                         <label className="form-label">Last Name</label>
                         <input
                             type="text"
-                            name="last_name"
                             className="form-input"
-                            value={formData.last_name}
-                            onChange={handleChange}
                             placeholder="Enter your last name"
+                            {...register('last_name', {
+                                minLength: {
+                                    value: 2,
+                                    message: 'Last name must be at least 2 characters'
+                                },
+                                maxLength: {
+                                    value: 50,
+                                    message: 'Last name must not exceed 50 characters'
+                                },
+                                pattern: {
+                                    value: /^[a-zA-Z\s'-]+$/,
+                                    message: 'Last name can only contain letters, spaces, hyphens and apostrophes'
+                                }
+                            })}
                         />
+                        {errors.last_name && (
+                            <span className="error-message">{errors.last_name.message}</span>
+                        )}
                     </div>
+
                     <div className="form-group">
                         <label className="form-label">Email Address *</label>
                         <input
                             type="email"
-                            name="email"
                             className="form-input"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
                             disabled
                             style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                            {...register('email')}
                         />
                         <small style={{ color: '#7a7a8a', fontSize: '12px', marginTop: '5px', display: 'block' }}>
                             Email cannot be changed
                         </small>
                     </div>
+
                     <div className="form-group">
                         <label className="form-label">Birthday</label>
                         <input
                             type="date"
-                            name="birthday"
                             className="form-input"
-                            value={formData.birthday}
-                            onChange={handleChange}
+                            {...register('birthday', {
+                                validate: {
+                                    notFuture: (value) => {
+                                        if (!value) return true;
+                                        return new Date(value) <= new Date() || 'Birthday cannot be in the future';
+                                    },
+                                    validAge: (value) => {
+                                        if (!value) return true;
+                                        const birthDate = new Date(value);
+                                        const today = new Date();
+                                        const age = today.getFullYear() - birthDate.getFullYear();
+                                        return age >= 13 || 'You must be at least 13 years old';
+                                    }
+                                }
+                            })}
                         />
+                        {errors.birthday && (
+                            <span className="error-message">{errors.birthday.message}</span>
+                        )}
                     </div>
+
                     <div className="form-group">
                         <label className="form-label">Gender</label>
                         <select
-                            name="gender"
                             className="form-input"
-                            value={formData.gender}
-                            onChange={handleChange}
+                            {...register('gender')}
                         >
                             <option value="">Select gender</option>
                             <option value="male">Male</option>
@@ -350,6 +372,7 @@ const AccountOverview = ({ user, getProfile }) => {
                             <option value="prefer-not-to-say">Prefer not to say</option>
                         </select>
                     </div>
+
                     <div className="form-buttons">
                         <button type="submit" className="save-button">
                             Save Changes
@@ -366,93 +389,70 @@ const AccountOverview = ({ user, getProfile }) => {
 
 const Settings = ({ user, getProfile }) => {
     const [showPasswordForm, setShowPasswordForm] = useState(false);
-    const [isSettingPassword, setIsSettingPassword] = useState(false);
-    const [passwordData, setPasswordData] = useState({
-        oldPassword: '',
-        password: '',
-        confirmPassword: ''
-    });
-
-    // Check if user needs to set password (OAuth users)
-    const needsPasswordSetup = !user.password && (user.authProvider === 'google' || user.authProvider === 'facebook');
-
-    const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (passwordData.password !== passwordData.confirmPassword) {
-        toast.error('Passwords do not match', {
-            position: 'bottom-center'
-        });
-        return;
-    }
-
-    if (passwordData.password.length < 6) {
-        toast.error('Password must be at least 6 characters', {
-            position: 'bottom-center'
-        });
-        return;
-    }
-
-    const config = {
-        headers: {
-            'Authorization': `Bearer ${getToken()}`
-        }
-    }
-
-    try {
-        let endpoint;
-        let payload;
-
-        if (needsPasswordSetup) {
-            // Get current Firebase user token
-            const { getAuth } = await import('firebase/auth');
-            const auth = getAuth();
-            const currentUser = auth.currentUser;
-            
-            if (!currentUser) {
-                toast.error('Please login again to set password', {
-                    position: 'bottom-center'
-                });
-                return;
-            }
-            
-            const firebaseToken = await currentUser.getIdToken();
-            
-            // Setting password for first time
-            endpoint = 'http://localhost:8000/api/v1/password/set';
-            payload = { 
-                password: passwordData.password,
-                token: firebaseToken
-            };
-        } else {
-            // Changing existing password
-            endpoint = 'http://localhost:8000/api/v1/password/update';
-            payload = {
-                oldPassword: passwordData.oldPassword,
-                password: passwordData.password
-            };
-        }
-
-        const { data } = await axios.put(endpoint, payload, config);
-
-        toast.success(data.message || 'Password updated successfully', {
-            position: 'bottom-center'
-        });
-        
-        setPasswordData({
+    const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
+        defaultValues: {
             oldPassword: '',
             password: '',
             confirmPassword: ''
-        });
-        setShowPasswordForm(false);
-        getProfile();
-    } catch (error) {
-        console.log(error);
-        toast.error(error.response?.data?.message || 'Error updating password', {
-            position: 'bottom-center'
-        });
-    }
-};
+        }
+    });
+
+    const needsPasswordSetup = !user.password && (user.authProvider === 'google' || user.authProvider === 'facebook');
+    const password = watch('password');
+
+    const onSubmit = async (formData) => {
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        }
+
+        try {
+            let endpoint;
+            let payload;
+
+            if (needsPasswordSetup) {
+                const { getAuth } = await import('firebase/auth');
+                const auth = getAuth();
+                const currentUser = auth.currentUser;
+                
+                if (!currentUser) {
+                    toast.error('Please login again to set password', {
+                        position: 'bottom-center'
+                    });
+                    return;
+                }
+                
+                const firebaseToken = await currentUser.getIdToken();
+                
+                endpoint = 'http://localhost:8000/api/v1/password/set';
+                payload = { 
+                    password: formData.password,
+                    token: firebaseToken
+                };
+            } else {
+                endpoint = 'http://localhost:8000/api/v1/password/update';
+                payload = {
+                    oldPassword: formData.oldPassword,
+                    password: formData.password
+                };
+            }
+
+            const { data } = await axios.put(endpoint, payload, config);
+
+            toast.success(data.message || 'Password updated successfully', {
+                position: 'bottom-center'
+            });
+            
+            reset();
+            setShowPasswordForm(false);
+            getProfile();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Error updating password', {
+                position: 'bottom-center'
+            });
+        }
+    };
 
     return (
         <div className="tab-content-wrapper">
@@ -467,47 +467,67 @@ const Settings = ({ user, getProfile }) => {
                     </button>
                 </div>
             ) : (
-                <form className="edit-form" onSubmit={handlePasswordSubmit}>
+                <form className="edit-form" onSubmit={handleSubmit(onSubmit)}>
                     {!needsPasswordSetup && (
                         <div className="form-group">
                             <label className="form-label">Current Password *</label>
                             <input
                                 type="password"
-                                name="oldPassword"
                                 className="form-input"
-                                value={passwordData.oldPassword}
-                                onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
                                 placeholder="Enter your current password"
-                                required
+                                {...register('oldPassword', {
+                                    required: 'Current password is required'
+                                })}
                             />
+                            {errors.oldPassword && (
+                                <span className="error-message">{errors.oldPassword.message}</span>
+                            )}
                         </div>
                     )}
+
                     <div className="form-group">
                         <label className="form-label">New Password *</label>
                         <input
                             type="password"
-                            name="password"
                             className="form-input"
-                            value={passwordData.password}
-                            onChange={(e) => setPasswordData({ ...passwordData, password: e.target.value })}
                             placeholder="Enter new password (min 6 characters)"
-                            required
-                            minLength="6"
+                            {...register('password', {
+                                required: 'New password is required',
+                                minLength: {
+                                    value: 6,
+                                    message: 'Password must be at least 6 characters'
+                                },
+                                maxLength: {
+                                    value: 128,
+                                    message: 'Password must not exceed 128 characters'
+                                },
+                                pattern: {
+                                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+                                    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+                                }
+                            })}
                         />
+                        {errors.password && (
+                            <span className="error-message">{errors.password.message}</span>
+                        )}
                     </div>
+
                     <div className="form-group">
                         <label className="form-label">Confirm New Password *</label>
                         <input
                             type="password"
-                            name="confirmPassword"
                             className="form-input"
-                            value={passwordData.confirmPassword}
-                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                             placeholder="Confirm your new password"
-                            required
-                            minLength="6"
+                            {...register('confirmPassword', {
+                                required: 'Please confirm your password',
+                                validate: (value) => value === password || 'Passwords do not match'
+                            })}
                         />
+                        {errors.confirmPassword && (
+                            <span className="error-message">{errors.confirmPassword.message}</span>
+                        )}
                     </div>
+
                     <div className="form-buttons">
                         <button type="submit" className="save-button">
                             {needsPasswordSetup ? 'Set Password' : 'Update Password'}
@@ -517,11 +537,7 @@ const Settings = ({ user, getProfile }) => {
                             className="cancel-button"
                             onClick={() => {
                                 setShowPasswordForm(false);
-                                setPasswordData({
-                                    oldPassword: '',
-                                    password: '',
-                                    confirmPassword: ''
-                                });
+                                reset();
                             }}
                         >
                             Cancel

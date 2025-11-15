@@ -8,11 +8,12 @@ const {
   updateTeam,
   deleteTeam
 } = require('../controllers/team');
+const { isAuthenticatedUser, authorizeRoles } = require('../middlewares/auth');
 
 router.get("/team", getTeam);
 router.get("/team/:id", getOneTeam);
-router.post("/team", upload.array("images", 10), createTeam);
-router.put("/team/:id", upload.array("images", 10), updateTeam);
-router.delete("/team/:id", deleteTeam);
+router.post("/team", isAuthenticatedUser, authorizeRoles('admin'), upload.array("images", 10), createTeam);
+router.put("/team/:id", isAuthenticatedUser, authorizeRoles('admin'), upload.array("images", 10), updateTeam);
+router.delete("/team/:id", isAuthenticatedUser, authorizeRoles('admin'), deleteTeam);
 
 module.exports = router; 

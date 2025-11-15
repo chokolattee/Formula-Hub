@@ -46,62 +46,92 @@ exports.getOneCategory = async (request, response) => {
     }
 };
 
-exports.createCategory = async (request, response) => {
-    const category = request.body;
+exports.getCategoryById = async (request, response) => {
+    try {
+        const { id } = request.params;
+        const category = await Category.findById(id).exec();
+        
+        response.status(200).json({ 
+            success: true, 
+            message: "Category Retrieved.", 
+            data: category 
+        });
+    } catch (error) {
+        console.log("Error in fetching Category: ", error.message);
+        response.status(500).json({ 
+            success: false, 
+            message: "Server Error."
+        });
+    }
+};
 
-    let images = []
-    if (typeof request.body.images === 'string') {
-        images.push(request.body.images)
-    } else {
-        images = request.body.images
+exports.createCategory = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide name and description.',
+      });
     }
 
-    let imagesLinks = [];
-    for (let i = 0; i < images.length; i++) {
+    let uploadedImages = [];
+    
+    if (req.files && req.files.length > 0) {
+      console.log('Processing', req.files.length, 'images...');
+      
+      for (const file of req.files) {
         try {
-            const result = await cloudinary.v2.uploader.upload(images[i], {
+          const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.v2.uploader.upload_stream(
+              {
                 folder: 'category',
                 width: 500,
                 height: 500,
-                crop: "scale",
-            });
-
-            imagesLinks.push({
-                public_id: result.public_id,
-                url: result.secure_url
-            })
-
-        } catch (error) {
-            console.log("Can't Upload", error)
+                crop: 'scale',
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            
+            uploadStream.end(file.buffer);
+          });
+          
+          uploadedImages.push({
+            public_id: result.public_id,
+            url: result.secure_url,
+          });
+          
+          console.log('Uploaded image:', result.secure_url);
+        } catch (uploadErr) {
+          console.error('Error uploading image:', uploadErr);
         }
+      }
     }
 
-    request.body.images = imagesLinks
+    const newCategory = await Category.create({
+      name,
+      description,
+      images: uploadedImages,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Category created successfully.',
+      data: newCategory,
+    });
+  } catch (error) {
+    console.error('Error creating category:', error);
     
-    if(!category.name || !category.description) {
-        return response.status(400).json({ 
-            success: false, 
-            message: "Please provide all fields."
-        });
-    }
-
-    const newCategory = new Category(category);
-
-    try {
-        await newCategory.save();
-        
-        response.status(201).json({ 
-            success: true, 
-            data: newCategory, 
-            message: "Category created Successfully!"
-        });
-    } catch (error) {
-        console.error("Error in Create Category:", error.message);
-        response.status(500).json({ 
-            success: false, 
-            message: "Server Error: Error in Creating Category."
-        });
-    }
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error: Unable to create category.',
+      error: error.message
+    });
+  }
 }
 
 exports.updateCategory = async (request, response) => {
