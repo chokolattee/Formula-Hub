@@ -3,17 +3,7 @@ import axios from "axios";
 import {
     Button,
     Box,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    IconButton,
     Typography,
-    Checkbox,
-    Collapse,
     Rating,
     TextField,
     Select,
@@ -22,8 +12,6 @@ import {
     InputLabel,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
@@ -37,6 +25,13 @@ import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// PrimeReact Components
+import "primereact/resources/themes/lara-light-cyan/theme.css";
+import "primereact/resources/primereact.min.css";
+import "primeicons/primeicons.css";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+
 import Sidebar from './Layout/SideBar';
 import MetaData from '../Layout/MetaData';
 import InfoModal from './Layout/InfoModal';
@@ -46,27 +41,25 @@ import '../../Styles/admin.css';
 
 const Reviews = () => {
     const viewRef = useRef(null);
+    const dt = useRef(null);
     
     const [allReviews, setAllReviews] = useState([]);
-    const [filteredReviews, setFilteredReviews] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [deleteError, setDeleteError] = useState('');
     const [isDeleted, setIsDeleted] = useState(false);
     const [viewModal, setViewModal] = useState(false);
-    const [checkedId, setCheckedId] = useState([]);
-    const [selectAll, setSelectAll] = useState(false);
+    const [selectedReviews, setSelectedReviews] = useState([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [user, setUser] = useState(getUser());
 
-    // Pagination
-    const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(10);
-    const [total, setTotal] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
+    // DataTable State
+    const [globalFilter, setGlobalFilter] = useState('');
+    const [expandedRows, setExpandedRows] = useState(null);
+    const [first, setFirst] = useState(0);
+    const [rows, setRows] = useState(10);
 
-    // Filters and Search
-    const [searchTerm, setSearchTerm] = useState('');
+    // Filters
     const [ratingFilter, setRatingFilter] = useState('all');
     const [productIdFilter, setProductIdFilter] = useState('');
 
@@ -126,14 +119,10 @@ const Reviews = () => {
         try {
             const { data } = await axios.get(`${import.meta.env.VITE_API}/review`, config);
             setAllReviews(data.data || []);
-            setFilteredReviews(data.data || []);
-            setTotal(data.data?.length || 0);
-            setTotalPages(Math.ceil((data.data?.length || 0) / limit));
             setLoading(false);
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to load reviews');
             setAllReviews([]);
-            setFilteredReviews([]);
             setLoading(false);
         }
     };
@@ -143,45 +132,31 @@ const Reviews = () => {
             const { data } = await axios.delete(`${import.meta.env.VITE_API}/review?id=${id}&productId=${productId}`, config);
             setIsDeleted(data.success);
             setAllReviews(prevReviews => prevReviews.filter(review => review._id !== id));
-            setCheckedId(prevChecked => prevChecked.filter(checkedId => checkedId !== id));
+            setSelectedReviews(prev => prev.filter(review => review._id !== id));
             successMsg('Review deleted successfully');
         } catch (error) {
             errMsg(error.response?.data?.message || 'Failed to delete review');
         }
     };
 
-    // Filter and search reviews
-    useEffect(() => {
+    // Filter reviews
+    const getFilteredReviews = () => {
         let filtered = [...allReviews];
         
-        // Apply product ID filter
         if (productIdFilter.trim()) {
             filtered = filtered.filter(review => 
                 review.product?._id?.toLowerCase().includes(productIdFilter.toLowerCase())
             );
         }
         
-        // Apply rating filter
         if (ratingFilter !== 'all') {
             filtered = filtered.filter(review => review.rating === parseInt(ratingFilter));
         }
         
-        // Apply search
-        if (searchTerm) {
-            filtered = filtered.filter(review => {
-                const userName = `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim();
-                return review._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       review.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       review.product?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-            });
-        }
-        
-        setFilteredReviews(filtered);
-        setTotal(filtered.length);
-        setTotalPages(Math.ceil(filtered.length / limit));
-        setPage(1);
-    }, [searchTerm, ratingFilter, productIdFilter, allReviews, limit]);
+        return filtered;
+    };
+
+    const filteredReviews = getFilteredReviews();
 
     useEffect(() => {
         if (error) {
@@ -298,36 +273,8 @@ const Reviews = () => {
         }
     };
 
-    const handleCheck = (id, isChecked) => {
-        setCheckedId((prevCheckedId) => {
-            if (isChecked) {
-                return [...prevCheckedId, id];
-            } else {
-                return prevCheckedId.filter((item) => item !== id);
-            }
-        });
-    };
-
-    const handleSelectAll = (isChecked) => {
-        setSelectAll(isChecked);
-        if (isChecked) {
-            const currentPageReviews = getCurrentPageReviews();
-            const allIds = currentPageReviews.map(review => review._id);
-            setCheckedId(allIds);
-        } else {
-            setCheckedId([]);
-        }
-    };
-
-    useEffect(() => {
-        const currentPageReviews = getCurrentPageReviews();
-        if (currentPageReviews.length > 0) {
-            setSelectAll(checkedId.length === currentPageReviews.length && currentPageReviews.every(review => checkedId.includes(review._id)));
-        }
-    }, [checkedId, page, filteredReviews]);
-
     const bulkDelete = () => {
-        if (checkedId.length === 0) {
+        if (selectedReviews.length === 0) {
             errMsg('Please select at least one review to delete');
             return;
         }
@@ -335,20 +282,18 @@ const Reviews = () => {
         Swal.fire({
             title: 'Delete Reviews',
             icon: 'warning',
-            text: `Are you sure you want to delete ${checkedId.length} review(s)?`,
+            text: `Are you sure you want to delete ${selectedReviews.length} review(s)?`,
             confirmButtonText: 'Delete',
             confirmButtonColor: '#d32f2f',
             showCancelButton: true
         }).then((result) => {
             if (result.isConfirmed) {
-                checkedId.forEach((id) => {
-                    const review = allReviews.find(r => r._id === id);
+                selectedReviews.forEach((review) => {
                     if (review) {
-                        deleteReview(id, review.product?._id);
+                        deleteReview(review._id, review.product?._id);
                     }
                 });
-                setCheckedId([]);
-                setSelectAll(false);
+                setSelectedReviews([]);
             }
         });
     };
@@ -386,7 +331,7 @@ const Reviews = () => {
         
         doc.setFontSize(11);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-        doc.text(`Total Reviews: ${total}`, 14, 36);
+        doc.text(`Total Reviews: ${filteredReviews.length}`, 14, 36);
         
         const tableData = filteredReviews.map(review => [
             review._id.substring(0, 8) + '...',
@@ -409,16 +354,113 @@ const Reviews = () => {
         successMsg('Reviews exported to PDF');
     };
 
-    const getCurrentPageReviews = () => {
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        return filteredReviews.slice(startIndex, endIndex);
+    // PrimeReact Templates
+    const rowExpansionTemplate = (data) => {
+        return (
+            <div style={{ padding: '1rem', backgroundColor: '#2a2a2a' }}>
+                <Typography variant="h6" gutterBottom style={{ marginBottom: '1rem', color: '#fff' }}>
+                    Review Details
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" style={{ color: '#fff', marginBottom: '0.5rem' }}>
+                        Product Information
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        <strong>Name:</strong> {data.product?.name || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        <strong>Price:</strong> ₱{data.product?.price?.toLocaleString() || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        <strong>Product ID:</strong> {data.product?._id || 'N/A'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" style={{ color: '#fff', marginBottom: '0.5rem' }}>
+                        Customer Information
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        <strong>Name:</strong> {data.user?.first_name} {data.user?.last_name}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        <strong>Email:</strong> {data.user?.email || 'N/A'}
+                    </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" style={{ color: '#fff', marginBottom: '0.5rem' }}>
+                        Review Content
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Rating value={data.rating} readOnly />
+                        <Typography variant="body2" style={{ color: '#ddd' }}>({data.rating}/5)</Typography>
+                    </Box>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        {data.comment}
+                    </Typography>
+                </Box>
+
+                <div className="collapsible-table__controls">
+                    <Button
+                        className='collapsible-control__item info'
+                        variant="contained"
+                        onClick={() => loadReviewView(data._id)}
+                        startIcon={<VisibilityIcon />}
+                    >
+                        View Full Details
+                    </Button>
+                    <Button
+                        className='collapsible-control__item delete'
+                        variant="contained"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => deleteReviewHandler(data._id, data.product?._id)}
+                    >
+                        Delete
+                    </Button>
+                </div>
+            </div>
+        );
     };
 
-    const currentPageReviews = getCurrentPageReviews();
+    const idBodyTemplate = (rowData) => {
+        return <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{rowData._id}</span>;
+    };
+
+    const productBodyTemplate = (rowData) => {
+        return rowData.product?.name || 'N/A';
+    };
+
+    const userBodyTemplate = (rowData) => {
+        return `${rowData.user?.first_name || ''} ${rowData.user?.last_name || ''}`.trim() || 'N/A';
+    };
+
+    const ratingBodyTemplate = (rowData) => {
+        return <Rating value={rowData.rating} readOnly size="small" />;
+    };
+
+    const commentBodyTemplate = (rowData) => {
+        return (
+            <Typography noWrap sx={{ maxWidth: '200px' }}>
+                {rowData.comment || 'No comment'}
+            </Typography>
+        );
+    };
+
+    const dateBodyTemplate = (rowData) => {
+        return new Date(rowData.createdAt).toLocaleDateString();
+    };
+
+    // Calculate pagination values
+    const totalRecords = filteredReviews.length;
+    const currentPage = Math.floor(first / rows) + 1;
+    const totalPages = Math.ceil(totalRecords / rows);
+
+    // Paginated data for display
+    const paginatedData = filteredReviews.slice(first, first + rows);
 
     return (
-        // ... (rest of the code remains the same)
         <>
             <MetaData title={'Product Reviews'} />
 
@@ -440,14 +482,21 @@ const Reviews = () => {
                             <Loader />
                         ) : (
                             <div className="main-container__admin">
-                                <div className="container sub-container__single-lg">
+                                <div className="sub-container__single-lg">
                                     {/* Filters and Search */}
-                                    <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <Box sx={{ 
+                                        mb: 2, 
+                                        display: 'flex', 
+                                        gap: 2, 
+                                        flexWrap: 'wrap', 
+                                        alignItems: 'center',
+                                        padding: '20px 20px 0 20px'
+                                    }}>
                                         <TextField
                                             size="small"
                                             placeholder="Search by Review ID, User, Comment, or Product Name..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            value={globalFilter}
+                                            onChange={(e) => setGlobalFilter(e.target.value)}
                                             sx={{ minWidth: 300, flexGrow: 1 }}
                                             InputProps={{
                                                 startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
@@ -458,7 +507,10 @@ const Reviews = () => {
                                             size="small"
                                             placeholder="Filter by Product ID"
                                             value={productIdFilter}
-                                            onChange={(e) => setProductIdFilter(e.target.value)}
+                                            onChange={(e) => {
+                                                setProductIdFilter(e.target.value);
+                                                setFirst(0);
+                                            }}
                                             sx={{ minWidth: 200 }}
                                         />
                                         
@@ -467,7 +519,10 @@ const Reviews = () => {
                                             <Select
                                                 value={ratingFilter}
                                                 label="Rating Filter"
-                                                onChange={(e) => setRatingFilter(e.target.value)}
+                                                onChange={(e) => {
+                                                    setRatingFilter(e.target.value);
+                                                    setFirst(0);
+                                                }}
                                             >
                                                 <MenuItem value="all">All Ratings</MenuItem>
                                                 <MenuItem value="5">5 Stars</MenuItem>
@@ -499,73 +554,110 @@ const Reviews = () => {
                                         </Box>
                                     </Box>
 
-                                    <div className="container-body">
-                                        <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 400px)', overflow: 'auto' }}>
-                                            <Table stickyHeader aria-label="reviews table">
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell />
-                                                        <TableCell align="center">
-                                                            <Checkbox
-                                                                checked={selectAll}
-                                                                indeterminate={checkedId.length > 0 && checkedId.length < currentPageReviews.length}
-                                                                onChange={(e) => handleSelectAll(e.target.checked)}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>Review ID</TableCell>
-                                                        <TableCell>Product</TableCell>
-                                                        <TableCell align="right">User</TableCell>
-                                                        <TableCell align="right">Rating</TableCell>
-                                                        <TableCell align="right">Comment</TableCell>
-                                                        <TableCell align="right">Date</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {currentPageReviews.length > 0 ? (
-                                                        currentPageReviews.map((review) => (
-                                                            <ReviewRow
-                                                                key={review._id}
-                                                                review={review}
-                                                                handleCheck={handleCheck}
-                                                                isChecked={checkedId.includes(review._id)}
-                                                                loadViewModal={loadReviewView}
-                                                                deleteReview={deleteReviewHandler}
-                                                            />
-                                                        ))
-                                                    ) : (
-                                                        <TableRow>
-                                                            <TableCell colSpan={8} align="center">
-                                                                <Typography>No reviews found</Typography>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    )}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
-                                    </div>
+                                    {/* DataTable - Direct Display */}
+                                    <Box sx={{ 
+                                        padding: '0 20px', 
+                                        height: 'calc(100vh - 420px)',
+                                        minHeight: '400px',
+                                        overflow: 'auto'
+                                    }}>
+                                        <DataTable
+                                            ref={dt}
+                                            value={paginatedData}
+                                            selection={selectedReviews}
+                                            onSelectionChange={(e) => setSelectedReviews(e.value)}
+                                            dataKey="_id"
+                                            paginator={false}
+                                            globalFilter={globalFilter}
+                                            responsiveLayout="scroll"
+                                            expandedRows={expandedRows}
+                                            onRowToggle={(e) => setExpandedRows(e.data)}
+                                            rowExpansionTemplate={rowExpansionTemplate}
+                                            emptyMessage="No reviews found"
+                                            stripedRows
+                                            loading={loading}
+                                            scrollable
+                                            scrollHeight="100%"
+                                            style={{ fontSize: '0.875rem' }}
+                                        >
+                                            <Column expander style={{ width: '3rem' }} />
+                                            <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
+                                            <Column 
+                                                field="_id" 
+                                                header="Review ID" 
+                                                body={idBodyTemplate} 
+                                                sortable 
+                                                style={{ minWidth: '250px' }} 
+                                            />
+                                            <Column 
+                                                field="product.name" 
+                                                header="Product" 
+                                                body={productBodyTemplate} 
+                                                sortable
+                                                style={{ minWidth: '180px' }}
+                                            />
+                                            <Column 
+                                                field="user" 
+                                                header="User" 
+                                                body={userBodyTemplate} 
+                                                sortable
+                                                style={{ minWidth: '150px' }}
+                                            />
+                                            <Column 
+                                                field="rating" 
+                                                header="Rating" 
+                                                body={ratingBodyTemplate} 
+                                                sortable
+                                                style={{ minWidth: '140px' }}
+                                            />
+                                            <Column 
+                                                field="comment" 
+                                                header="Comment" 
+                                                body={commentBodyTemplate} 
+                                                sortable
+                                                style={{ minWidth: '200px', maxWidth: '200px' }}
+                                            />
+                                            <Column 
+                                                field="createdAt" 
+                                                header="Date" 
+                                                body={dateBodyTemplate} 
+                                                sortable
+                                                style={{ minWidth: '140px' }}
+                                            />
+                                        </DataTable>
+                                    </Box>
 
-                                    <div className="container-footer" style={{ padding: '16px' }}>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                            {/* Action Buttons */}
+                                    {/* Footer with Action Buttons and Pagination */}
+                                    <Box sx={{ 
+                                        padding: '16px 20px',
+                                        borderTop: '1px solid rgba(225, 6, 0, 0.2)',
+                                        marginTop: 'auto'
+                                    }}>
+                                        <Box sx={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 2,
+                                        }}>
+                                            {/* Action Buttons Row */}
                                             <Box sx={{
                                                 display: 'flex',
                                                 justifyContent: 'flex-start',
                                                 gap: 2,
-                                                borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                                                borderBottom: '1px solid rgba(224, 224, 224, 0.2)',
                                                 pb: 2
                                             }}>
                                                 <Button
                                                     variant="contained"
-                                                    color="error"
+                                                    className='invert-button'
                                                     onClick={bulkDelete}
-                                                    disabled={checkedId.length === 0}
+                                                    disabled={selectedReviews.length === 0}
                                                     startIcon={<DeleteIcon />}
                                                 >
-                                                    Bulk Delete {checkedId.length > 0 ? `(${checkedId.length})` : ''}
+                                                    Bulk Delete {selectedReviews.length > 0 ? `(${selectedReviews.length})` : ''}
                                                 </Button>
                                             </Box>
 
-                                            {/* Pagination */}
+                                            {/* Pagination Row */}
                                             <Box sx={{
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
@@ -573,11 +665,56 @@ const Reviews = () => {
                                                 flexWrap: 'wrap',
                                                 gap: 2
                                             }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                {/* Left side - Page Size & Total */}
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 2,
+                                                    flex: '1 1 auto'
+                                                }}>
                                                     <FormControl size="small" sx={{ minWidth: 120 }}>
                                                         <Select
-                                                            value={limit}
-                                                            onChange={(e) => setLimit(Number(e.target.value))}
+                                                            value={rows}
+                                                            onChange={(e) => {
+                                                                setRows(Number(e.target.value));
+                                                                setFirst(0);
+                                                            }}
+                                                            sx={{
+                                                                height: '36px',
+                                                                color: '#fff',
+                                                                backgroundColor: '#3a3a3a',
+                                                                '& .MuiSelect-select': {
+                                                                    paddingY: '8px',
+                                                                },
+                                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                                    borderColor: '#555',
+                                                                },
+                                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                                    borderColor: '#777',
+                                                                },
+                                                                '& .MuiSvgIcon-root': {
+                                                                    color: '#fff',
+                                                                }
+                                                            }}
+                                                            MenuProps={{
+                                                                PaperProps: {
+                                                                    sx: {
+                                                                        bgcolor: '#3a3a3a',
+                                                                        '& .MuiMenuItem-root': {
+                                                                            color: '#fff',
+                                                                            '&:hover': {
+                                                                                backgroundColor: '#4a4a4a',
+                                                                            },
+                                                                            '&.Mui-selected': {
+                                                                                backgroundColor: '#5a5a5a',
+                                                                                '&:hover': {
+                                                                                    backgroundColor: '#6a6a6a',
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }}
                                                         >
                                                             <MenuItem value={5}>5 per page</MenuItem>
                                                             <MenuItem value={10}>10 per page</MenuItem>
@@ -585,35 +722,59 @@ const Reviews = () => {
                                                             <MenuItem value={50}>50 per page</MenuItem>
                                                         </Select>
                                                     </FormControl>
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        Total Reviews: {total}
+                                                    <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: '200px' }}>
+                                                        Total Reviews: {totalRecords}
                                                     </Typography>
                                                 </Box>
 
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {/* Right side - Pagination Controls */}
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 1,
+                                                    flex: '0 0 auto'
+                                                }}>
                                                     <Button
                                                         variant="outlined"
                                                         size="small"
-                                                        disabled={page === 1}
-                                                        onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                                        disabled={first === 0}
+                                                        onClick={() => setFirst(Math.max(0, first - rows))}
+                                                        sx={{
+                                                            minWidth: '32px',
+                                                            height: '32px',
+                                                            px: 1
+                                                        }}
                                                     >
                                                         <NavigateBeforeIcon />
                                                     </Button>
-                                                    <Typography variant="body2" sx={{ mx: 2 }}>
-                                                        Page {page} of {totalPages || 1}
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            mx: 2,
+                                                            minWidth: '100px',
+                                                            textAlign: 'center',
+                                                            color: '#fff'
+                                                        }}
+                                                    >
+                                                        Page {currentPage} of {totalPages || 1}
                                                     </Typography>
                                                     <Button
                                                         variant="outlined"
                                                         size="small"
-                                                        disabled={page === totalPages || totalPages === 0}
-                                                        onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                                        disabled={first + rows >= totalRecords}
+                                                        onClick={() => setFirst(Math.min(totalRecords - rows, first + rows))}
+                                                        sx={{
+                                                            minWidth: '32px',
+                                                            height: '32px',
+                                                            px: 1
+                                                        }}
                                                     >
                                                         <NavigateNextIcon />
                                                     </Button>
                                                 </Box>
                                             </Box>
                                         </Box>
-                                    </div>
+                                    </Box>
                                 </div>
                             </div>
                         )}
@@ -629,125 +790,17 @@ const Reviews = () => {
                 unmountOnExit
                 nodeRef={viewRef}
             >
-                <InfoModal
-                    ref={viewRef}
-                    setOpenModal={setViewModal}
-                    modalData={modalData}
-                    formState={formState}
-                />
+                <div style={{ position: 'fixed', zIndex: 9999 }}>
+                    <InfoModal
+                        ref={viewRef}
+                        setOpenModal={setViewModal}
+                        modalData={modalData}
+                        formState={formState}
+                    />
+                </div>
             </CSSTransition>
         </>
     );
 };
-
-// Review Row Component
-function ReviewRow({ review, handleCheck, isChecked, loadViewModal, deleteReview }) {
-    const [open, setOpen] = useState(false);
-
-    return (
-        <>
-            <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
-                <TableCell>
-                    <IconButton size="small" onClick={() => setOpen(!open)}>
-                        {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                    </IconButton>
-                </TableCell>
-                <TableCell align="center">
-                    <Checkbox
-                        checked={isChecked}
-                        onChange={(e) => handleCheck(review._id, e.target.checked)}
-                    />
-                </TableCell>
-                <TableCell sx={{ minWidth: '200px', fontFamily: 'monospace' }}>
-                    {review._id}
-                </TableCell>
-                <TableCell>{review.product?.name || 'N/A'}</TableCell>
-                <TableCell align="right">
-                    {review.user?.first_name} {review.user?.last_name}
-                </TableCell>
-                <TableCell align="right">
-                    <Rating value={review.rating} readOnly size="small" />
-                </TableCell>
-                <TableCell align="right" sx={{ maxWidth: '200px' }}>
-                    <Typography noWrap>{review.comment}</Typography>
-                </TableCell>
-                <TableCell align="right">
-                    {new Date(review.createdAt).toLocaleDateString()}
-                </TableCell>
-            </TableRow>
-            <TableRow>
-                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 2 }}>
-                            <Typography variant="h6" gutterBottom>
-                                Review Details
-                            </Typography>
-                            
-                            <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Product Information
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Name:</strong> {review.product?.name || 'N/A'}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Price:</strong> ₱{review.product?.price?.toLocaleString() || 'N/A'}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Product ID:</strong> {review.product?._id || 'N/A'}
-                                </Typography>
-                            </Box>
-
-                            <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Customer Information
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Name:</strong> {review.user?.first_name} {review.user?.last_name}
-                                </Typography>
-                                <Typography variant="body2">
-                                    <strong>Email:</strong> {review.user?.email || 'N/A'}
-                                </Typography>
-                            </Box>
-
-                            <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Review Content
-                                </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                    <Rating value={review.rating} readOnly />
-                                    <Typography variant="body2">({review.rating}/5)</Typography>
-                                </Box>
-                                <Typography variant="body2">
-                                    {review.comment}
-                                </Typography>
-                            </Box>
-
-                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                                <Button
-                                    variant="contained"
-                                    onClick={() => loadViewModal(review._id)}
-                                    startIcon={<VisibilityIcon />}
-                                    size="small"
-                                >
-                                    View Full Details
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    color="error"
-                                    startIcon={<DeleteIcon />}
-                                    onClick={() => deleteReview(review._id, review.product?._id)}
-                                    size="small"
-                                >
-                                    Delete
-                                </Button>
-                            </Box>
-                        </Box>
-                    </Collapse>
-                </TableCell>
-            </TableRow>
-        </>
-    );
-}
 
 export default Reviews;

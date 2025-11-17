@@ -10,26 +10,22 @@ import axios from 'axios'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-import Paper from '@mui/material/Paper'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
+// PrimeReact Components
+import "primereact/resources/themes/lara-light-cyan/theme.css"
+import "primereact/resources/primereact.min.css"
+import "primeicons/primeicons.css"
+import { DataTable } from 'primereact/datatable'
+import { Column } from 'primereact/column'
+
+// Material UI Components
 import Button from '@mui/material/Button'
-import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
-import Checkbox from '@mui/material/Checkbox'
-import Collapse from '@mui/material/Collapse'
 import TextField from '@mui/material/TextField'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import DeleteIcon from '@mui/icons-material/Delete'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore'
@@ -42,25 +38,22 @@ import '../../Styles/admin.css'
 
 const OrdersList = () => {
     const navigate = useNavigate()
+    const dt = useRef(null)
+    
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [allOrders, setAllOrders] = useState([])
-    const [filteredOrders, setFilteredOrders] = useState([])
     const [isDeleted, setIsDeleted] = useState(false)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     
-    // Pagination
-    const [page, setPage] = useState(1)
-    const [limit, setLimit] = useState(10)
-    const [total, setTotal] = useState(0)
-    const [totalPages, setTotalPages] = useState(0)
+    // DataTable State
+    const [selectedOrders, setSelectedOrders] = useState([])
+    const [expandedRows, setExpandedRows] = useState(null)
+    const [globalFilter, setGlobalFilter] = useState('')
+    const [first, setFirst] = useState(0)
+    const [rows, setRows] = useState(10)
     
-    // Selection
-    const [checkedId, setCheckedId] = useState([])
-    const [selectAll, setSelectAll] = useState(false)
-    
-    // Filters and Search
-    const [searchTerm, setSearchTerm] = useState('')
+    // Filters
     const [statusFilter, setStatusFilter] = useState('all')
     
     const errMsg = (message = '') => toast.error(message, {
@@ -80,9 +73,6 @@ const OrdersList = () => {
             }
             const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/orders`, config)
             setAllOrders(data.orders)
-            setFilteredOrders(data.orders)
-            setTotal(data.orders.length)
-            setTotalPages(Math.ceil(data.orders.length / limit))
             setLoading(false)
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to load orders')
@@ -101,7 +91,7 @@ const OrdersList = () => {
             const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/order/${id}`, config)
             setIsDeleted(data.success)
             setAllOrders(prevOrders => prevOrders.filter(order => order._id !== id))
-            setCheckedId(prevChecked => prevChecked.filter(checkedId => checkedId !== id))
+            setSelectedOrders(prev => prev.filter(order => order._id !== id))
             successMsg('Order deleted successfully')
         } catch (error) {
             errMsg(error.response?.data?.message || 'Failed to delete order')
@@ -140,29 +130,15 @@ const OrdersList = () => {
         return 'N/A';
     };
 
-    // Filter and search orders
-    useEffect(() => {
-        let filtered = [...allOrders]
-        
-        // Apply status filter
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(order => order.orderStatus === statusFilter)
+    // Filter orders by status
+    const getFilteredOrders = () => {
+        if (statusFilter === 'all') {
+            return allOrders;
         }
-        
-        // Apply search
-        if (searchTerm) {
-            filtered = filtered.filter(order => {
-                const customerName = getCustomerName(order.user);
-                return order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       customerName.toLowerCase().includes(searchTerm.toLowerCase());
-            });
-        }
-        
-        setFilteredOrders(filtered)
-        setTotal(filtered.length)
-        setTotalPages(Math.ceil(filtered.length / limit))
-        setPage(1)
-    }, [searchTerm, statusFilter, allOrders, limit])
+        return allOrders.filter(order => order.orderStatus === statusFilter);
+    };
+
+    const filteredOrders = getFilteredOrders();
 
     const deleteOrderHandler = (id) => {
         if (window.confirm('Are you sure you want to delete this order?')) {
@@ -170,53 +146,18 @@ const OrdersList = () => {
         }
     }
 
-    const handleCheck = (id, isChecked) => {
-        setCheckedId((prevCheckedId) => {
-            if (isChecked) {
-                return [...prevCheckedId, id]
-            } else {
-                return prevCheckedId.filter((item) => item !== id)
-            }
-        })
-    }
-
-    const handleSelectAll = (isChecked) => {
-        setSelectAll(isChecked)
-        if (isChecked) {
-            const currentPageOrders = getCurrentPageOrders()
-            const allIds = currentPageOrders.map(order => order._id)
-            setCheckedId(allIds)
-        } else {
-            setCheckedId([])
-        }
-    }
-
-    useEffect(() => {
-        const currentPageOrders = getCurrentPageOrders()
-        if (currentPageOrders.length > 0) {
-            setSelectAll(checkedId.length === currentPageOrders.length && currentPageOrders.every(order => checkedId.includes(order._id)))
-        }
-    }, [checkedId, page, filteredOrders])
-
     const bulkDelete = () => {
-        if (checkedId.length === 0) {
+        if (selectedOrders.length === 0) {
             errMsg('Please select at least one order to delete')
             return
         }
 
-        if (window.confirm(`Are you sure you want to delete ${checkedId.length} order(s)?`)) {
-            checkedId.forEach((id) => {
-                deleteOrder(id)
+        if (window.confirm(`Are you sure you want to delete ${selectedOrders.length} order(s)?`)) {
+            selectedOrders.forEach((order) => {
+                deleteOrder(order._id)
             })
-            setCheckedId([])
-            setSelectAll(false)
+            setSelectedOrders([])
         }
-    }
-
-    const getCurrentPageOrders = () => {
-        const startIndex = (page - 1) * limit
-        const endIndex = startIndex + limit
-        return filteredOrders.slice(startIndex, endIndex)
     }
 
     const exportToCSV = () => {
@@ -230,7 +171,7 @@ const OrdersList = () => {
         }))
 
         const headers = Object.keys(csvData[0]).join(',')
-        const rows = csvData.map(row => Object.values(row).join(','))
+        const rows = csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
         const csv = [headers, ...rows].join('\n')
 
         const blob = new Blob([csv], { type: 'text/csv' })
@@ -250,7 +191,7 @@ const OrdersList = () => {
         
         doc.setFontSize(11)
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30)
-        doc.text(`Total Orders: ${total}`, 14, 36)
+        doc.text(`Total Orders: ${filteredOrders.length}`, 14, 36)
         
         const tableData = filteredOrders.map(order => [
             order._id.substring(0, 8) + '...',
@@ -273,9 +214,133 @@ const OrdersList = () => {
         successMsg('Orders exported to PDF')
     }
 
-    if (loading) return <Loader />
+    // PrimeReact Templates
+    const rowExpansionTemplate = (data) => {
+        return (
+            <div style={{ padding: '1rem', backgroundColor: '#2a2a2a' }}>
+                <Typography variant="h6" gutterBottom style={{ marginBottom: '1rem', color: '#fff' }}>
+                    Order Details
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" style={{ color: '#fff', marginBottom: '0.5rem' }}>
+                        Shipping Information
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        {data.shippingInfo?.address}, {data.shippingInfo?.city}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        {data.shippingInfo?.country} - {data.shippingInfo?.postalCode}
+                    </Typography>
+                    <Typography variant="body2" style={{ color: '#ddd' }}>
+                        Phone: {data.shippingInfo?.phoneNo}
+                    </Typography>
+                </Box>
 
-    const currentPageOrders = getCurrentPageOrders()
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" style={{ color: '#fff', marginBottom: '0.5rem' }}>
+                        Order Items
+                    </Typography>
+                    <div style={{ backgroundColor: '#333', borderRadius: '4px', padding: '1rem' }}>
+                        {data.orderItems.map((item, index) => (
+                            <Box key={index} sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                mb: 1,
+                                pb: 1,
+                                borderBottom: index < data.orderItems.length - 1 ? '1px solid #444' : 'none'
+                            }}>
+                                <Typography variant="body2" style={{ color: '#fff' }}>
+                                    {item.name}
+                                </Typography>
+                                <Typography variant="body2" style={{ color: '#fff' }}>
+                                    Qty: {item.quantity} × ₱{item.price}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </div>
+                </Box>
+
+                <div className="collapsible-table__controls">
+                    <Button
+                        component={Link}
+                        to={`/admin/order/${data._id}`}
+                        className='collapsible-control__item info'
+                        variant="contained"
+                        startIcon={<VisibilityIcon />}
+                    >
+                        View Details
+                    </Button>
+                    <Button
+                        className='collapsible-control__item delete'
+                        variant="contained"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => deleteOrderHandler(data._id)}
+                    >
+                        Delete
+                    </Button>
+                </div>
+            </div>
+        );
+    };
+
+    const idBodyTemplate = (rowData) => {
+        return <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{rowData._id}</span>;
+    };
+
+    const customerBodyTemplate = (rowData) => {
+        return getCustomerName(rowData.user);
+    };
+
+    const itemsBodyTemplate = (rowData) => {
+        return rowData.orderItems.length;
+    };
+
+    const amountBodyTemplate = (rowData) => {
+        return <span style={{ fontWeight: 'bold' }}>₱{rowData.totalPrice}</span>;
+    };
+
+    const statusBodyTemplate = (rowData) => {
+        const getStatusColor = (status) => {
+            switch (status) {
+                case 'Processing': return '#ff9800'
+                case 'Shipped': return '#2196f3'
+                case 'Delivered': return '#4caf50'
+                default: return '#757575'
+            }
+        };
+
+        return (
+            <Box
+                sx={{
+                    display: 'inline-block',
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 1,
+                    bgcolor: getStatusColor(rowData.orderStatus) + '20',
+                    color: getStatusColor(rowData.orderStatus),
+                    fontWeight: 'bold',
+                    fontSize: '0.875rem'
+                }}
+            >
+                {rowData.orderStatus}
+            </Box>
+        );
+    };
+
+    const dateBodyTemplate = (rowData) => {
+        return new Date(rowData.createdAt).toLocaleDateString();
+    };
+
+    // Calculate pagination values
+    const totalRecords = filteredOrders.length;
+    const currentPage = Math.floor(first / rows) + 1;
+    const totalPages = Math.ceil(totalRecords / rows);
+
+    // Paginated data for display
+    const paginatedData = filteredOrders.slice(first, first + rows);
+
+    if (loading) return <Loader />
 
     return (
         <>
@@ -296,15 +361,22 @@ const OrdersList = () => {
                         <h1 className="my-4">Orders Management</h1>
 
                         <div className="main-container__admin">
-                            <div className="container sub-container__single-lg">
+                            <div className="sub-container__single-lg">
                                 {/* Filters and Search */}
-                                <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <Box sx={{ 
+                                    mb: 2, 
+                                    display: 'flex', 
+                                    gap: 2, 
+                                    flexWrap: 'wrap', 
+                                    alignItems: 'center',
+                                    padding: '20px 20px 0 20px'
+                                }}>
                                     <TextField
                                         size="small"
                                         placeholder="Search by Order ID or Customer..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        sx={{ minWidth: 300 }}
+                                        value={globalFilter}
+                                        onChange={(e) => setGlobalFilter(e.target.value)}
+                                        sx={{ minWidth: 300, flexGrow: 1 }}
                                         InputProps={{
                                             startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                                         }}
@@ -315,7 +387,10 @@ const OrdersList = () => {
                                         <Select
                                             value={statusFilter}
                                             label="Status Filter"
-                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            onChange={(e) => {
+                                                setStatusFilter(e.target.value);
+                                                setFirst(0);
+                                            }}
                                         >
                                             <MenuItem value="all">All Status</MenuItem>
                                             <MenuItem value="Processing">Processing</MenuItem>
@@ -345,72 +420,110 @@ const OrdersList = () => {
                                     </Box>
                                 </Box>
 
-                                <div className="container-body">
-                                    <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 400px)', overflow: 'auto' }}>
-                                        <Table stickyHeader aria-label="orders table">
-                                            <TableHead>
-                                                <TableRow>
-                                                    <TableCell />
-                                                    <TableCell align="center">
-                                                        <Checkbox
-                                                            checked={selectAll}
-                                                            indeterminate={checkedId.length > 0 && checkedId.length < currentPageOrders.length}
-                                                            onChange={(e) => handleSelectAll(e.target.checked)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>Order ID</TableCell>
-                                                    <TableCell align="right">Customer</TableCell>
-                                                    <TableCell align="right">Items</TableCell>
-                                                    <TableCell align="right">Amount</TableCell>
-                                                    <TableCell align="right">Status</TableCell>
-                                                    <TableCell align="right">Date</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {currentPageOrders.length > 0 ? (
-                                                    currentPageOrders.map((order) => (
-                                                        <OrderRow
-                                                            key={order._id}
-                                                            order={order}
-                                                            handleCheck={handleCheck}
-                                                            isChecked={checkedId.includes(order._id)}
-                                                            deleteOrder={deleteOrderHandler}
-                                                        />
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={8} align="center">
-                                                            <Typography>No orders found</Typography>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                </div>
+                                {/* DataTable - Direct Display */}
+                                <Box sx={{ 
+                                    padding: '0 20px', 
+                                    height: 'calc(100vh - 420px)',
+                                    minHeight: '400px',
+                                    overflow: 'auto'
+                                }}>
+                                    <DataTable
+                                        ref={dt}
+                                        value={paginatedData}
+                                        selection={selectedOrders}
+                                        onSelectionChange={(e) => setSelectedOrders(e.value)}
+                                        dataKey="_id"
+                                        paginator={false}
+                                        globalFilter={globalFilter}
+                                        responsiveLayout="scroll"
+                                        expandedRows={expandedRows}
+                                        onRowToggle={(e) => setExpandedRows(e.data)}
+                                        rowExpansionTemplate={rowExpansionTemplate}
+                                        emptyMessage="No orders found"
+                                        stripedRows
+                                        loading={loading}
+                                        scrollable
+                                        scrollHeight="100%"
+                                        style={{ fontSize: '0.875rem' }}
+                                    >
+                                        <Column expander style={{ width: '3rem' }} />
+                                        <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
+                                        <Column 
+                                            field="_id" 
+                                            header="Order ID" 
+                                            body={idBodyTemplate} 
+                                            sortable 
+                                            style={{ minWidth: '250px' }} 
+                                        />
+                                        <Column 
+                                            field="user" 
+                                            header="Customer" 
+                                            body={customerBodyTemplate} 
+                                            sortable
+                                            style={{ minWidth: '150px' }}
+                                        />
+                                        <Column 
+                                            field="orderItems" 
+                                            header="Items" 
+                                            body={itemsBodyTemplate} 
+                                            sortable
+                                            style={{ minWidth: '80px' }}
+                                        />
+                                        <Column 
+                                            field="totalPrice" 
+                                            header="Amount" 
+                                            body={amountBodyTemplate} 
+                                            sortable
+                                            style={{ minWidth: '120px' }}
+                                        />
+                                        <Column 
+                                            field="orderStatus" 
+                                            header="Status" 
+                                            body={statusBodyTemplate} 
+                                            sortable
+                                            style={{ minWidth: '140px' }}
+                                        />
+                                        <Column 
+                                            field="createdAt" 
+                                            header="Date" 
+                                            body={dateBodyTemplate} 
+                                            sortable
+                                            style={{ minWidth: '150px' }}
+                                        />
+                                    </DataTable>
+                                </Box>
 
-                                <div className="container-footer" style={{ padding: '16px' }}>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        {/* Action Buttons */}
+                                {/* Footer with Action Buttons and Pagination */}
+                                <Box sx={{ 
+                                    padding: '16px 20px',
+                                    borderTop: '1px solid rgba(225, 6, 0, 0.2)',
+                                    marginTop: 'auto'
+                                }}>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 2,
+                                    }}>
+                                        {/* Action Buttons Row */}
                                         <Box sx={{
                                             display: 'flex',
                                             justifyContent: 'flex-start',
                                             gap: 2,
-                                            borderBottom: '1px solid rgba(224, 224, 224, 1)',
+                                            borderBottom: '1px solid rgba(224, 224, 224, 0.2)',
                                             pb: 2
                                         }}>
                                             <Button
                                                 variant="contained"
-                                                color="error"
+                                                className='invert-button'
                                                 onClick={bulkDelete}
-                                                disabled={checkedId.length === 0}
+                                                disabled={selectedOrders.length === 0}
                                                 startIcon={<DeleteIcon />}
                                             >
-                                                Bulk Delete {checkedId.length > 0 ? `(${checkedId.length})` : ''}
+                                                Bulk Delete {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ''}
                                             </Button>
                                         </Box>
 
-                                        {/* Pagination */}
+                                        {/* Pagination Row */}
                                         <Box sx={{
                                             display: 'flex',
                                             justifyContent: 'space-between',
@@ -418,11 +531,56 @@ const OrdersList = () => {
                                             flexWrap: 'wrap',
                                             gap: 2
                                         }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            {/* Left side - Page Size & Total */}
+                                            <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 2,
+                                                flex: '1 1 auto'
+                                            }}>
                                                 <FormControl size="small" sx={{ minWidth: 120 }}>
                                                     <Select
-                                                        value={limit}
-                                                        onChange={(e) => setLimit(Number(e.target.value))}
+                                                        value={rows}
+                                                        onChange={(e) => {
+                                                            setRows(Number(e.target.value));
+                                                            setFirst(0);
+                                                        }}
+                                                        sx={{
+                                                            height: '36px',
+                                                            color: '#fff',
+                                                            backgroundColor: '#3a3a3a',
+                                                            '& .MuiSelect-select': {
+                                                                paddingY: '8px',
+                                                            },
+                                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: '#555',
+                                                            },
+                                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: '#777',
+                                                            },
+                                                            '& .MuiSvgIcon-root': {
+                                                                color: '#fff',
+                                                            }
+                                                        }}
+                                                        MenuProps={{
+                                                            PaperProps: {
+                                                                sx: {
+                                                                    bgcolor: '#3a3a3a',
+                                                                    '& .MuiMenuItem-root': {
+                                                                        color: '#fff',
+                                                                        '&:hover': {
+                                                                            backgroundColor: '#4a4a4a',
+                                                                        },
+                                                                        '&.Mui-selected': {
+                                                                            backgroundColor: '#5a5a5a',
+                                                                            '&:hover': {
+                                                                                backgroundColor: '#6a6a6a',
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }}
                                                     >
                                                         <MenuItem value={5}>5 per page</MenuItem>
                                                         <MenuItem value={10}>10 per page</MenuItem>
@@ -430,179 +588,64 @@ const OrdersList = () => {
                                                         <MenuItem value={50}>50 per page</MenuItem>
                                                     </Select>
                                                 </FormControl>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    Total Orders: {total}
+                                                <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: '200px' }}>
+                                                    Total Orders: {totalRecords}
                                                 </Typography>
                                             </Box>
 
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            {/* Right side - Pagination Controls */}
+                                            <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                flex: '0 0 auto'
+                                            }}>
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
-                                                    disabled={page === 1}
-                                                    onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                                    disabled={first === 0}
+                                                    onClick={() => setFirst(Math.max(0, first - rows))}
+                                                    sx={{
+                                                        minWidth: '32px',
+                                                        height: '32px',
+                                                        px: 1
+                                                    }}
                                                 >
                                                     <NavigateBeforeIcon />
                                                 </Button>
-                                                <Typography variant="body2" sx={{ mx: 2 }}>
-                                                    Page {page} of {totalPages || 1}
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        mx: 2,
+                                                        minWidth: '100px',
+                                                        textAlign: 'center',
+                                                        color: '#fff'
+                                                    }}
+                                                >
+                                                    Page {currentPage} of {totalPages || 1}
                                                 </Typography>
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
-                                                    disabled={page === totalPages || totalPages === 0}
-                                                    onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                                    disabled={first + rows >= totalRecords}
+                                                    onClick={() => setFirst(Math.min(totalRecords - rows, first + rows))}
+                                                    sx={{
+                                                        minWidth: '32px',
+                                                        height: '32px',
+                                                        px: 1
+                                                    }}
                                                 >
                                                     <NavigateNextIcon />
                                                 </Button>
                                             </Box>
                                         </Box>
                                     </Box>
-                                </div>
+                                </Box>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </>
-    )
-}
-
-function OrderRow({ order, handleCheck, isChecked, deleteOrder }) {
-    const [open, setOpen] = useState(false)
-
-    const getCustomerName = (user) => {
-        if (!user) return 'N/A';
-        if (user.name) return user.name;
-        if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`;
-        if (user.first_name) return user.first_name;
-        if (user.last_name) return user.last_name;
-        return 'N/A';
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Processing': return '#ff9800'
-            case 'Shipped': return '#2196f3'
-            case 'Delivered': return '#4caf50'
-            default: return '#757575'
-        }
-    }
-
-    return (
-        <>
-            <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
-                <TableCell>
-                    <IconButton
-                        size="small"
-                        onClick={() => setOpen(!open)}
-                    >
-                        {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                    </IconButton>
-                </TableCell>
-                <TableCell align="center">
-                    <Checkbox
-                        checked={isChecked}
-                        onChange={(e) => handleCheck(order._id, e.target.checked)}
-                    />
-                </TableCell>
-                <TableCell sx={{ minWidth: '200px', fontFamily: 'monospace' }}>
-                    {order._id}
-                </TableCell>
-                <TableCell align="right">{getCustomerName(order.user)}</TableCell>
-                <TableCell align="right">{order.orderItems.length}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                    ₱{order.totalPrice}
-                </TableCell>
-                <TableCell align="right">
-                    <Box
-                        sx={{
-                            display: 'inline-block',
-                            px: 2,
-                            py: 0.5,
-                            borderRadius: 1,
-                            bgcolor: getStatusColor(order.orderStatus) + '20',
-                            color: getStatusColor(order.orderStatus),
-                            fontWeight: 'bold',
-                            fontSize: '0.875rem'
-                        }}
-                    >
-                        {order.orderStatus}
-                    </Box>
-                </TableCell>
-                <TableCell align="right">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                </TableCell>
-            </TableRow>
-            <TableRow>
-                <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 2 }}>
-                            <Typography variant="h6" gutterBottom>
-                                Order Details
-                            </Typography>
-                            
-                            <Box sx={{ mb: 2 }}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                    Shipping Information
-                                </Typography>
-                                <Typography variant="body2">
-                                    {order.shippingInfo?.address}, {order.shippingInfo?.city}
-                                </Typography>
-                                <Typography variant="body2">
-                                    {order.shippingInfo?.country} - {order.shippingInfo?.postalCode}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Phone: {order.shippingInfo?.phoneNo}
-                                </Typography>
-                            </Box>
-
-                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                Order Items
-                            </Typography>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Product</TableCell>
-                                        <TableCell align="right">Quantity</TableCell>
-                                        <TableCell align="right">Price</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {order.orderItems.map((item, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell>{item.name}</TableCell>
-                                            <TableCell align="right">{item.quantity}</TableCell>
-                                            <TableCell align="right">₱{item.price}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-
-                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                                <Button
-                                    component={Link}
-                                    to={`/admin/order/${order._id}`}
-                                    variant="contained"
-                                    startIcon={<VisibilityIcon />}
-                                    size="small"
-                                >
-                                    View Details
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    color="error"
-                                    startIcon={<DeleteIcon />}
-                                    onClick={() => deleteOrder(order._id)}
-                                    size="small"
-                                >
-                                    Delete
-                                </Button>
-                            </Box>
-                        </Box>
-                    </Collapse>
-                </TableCell>
-            </TableRow>
         </>
     )
 }

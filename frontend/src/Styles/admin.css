@@ -15,7 +15,7 @@
 .main-container__admin {
     position: relative;
     margin-top: 1px;
-    height: 90vh;
+    height: 100%;
     width: 100%;
     max-width: 100%;
     display: flex;
@@ -62,8 +62,8 @@
 
 .sub-container__single-lg {
     border-radius: 10px;
-    height: calc(100vh - 150px);
-    min-height: 600px;
+    height: calc(100vh - 120px); /* Increased from calc(100vh - 150px) */
+    min-height: 700px; /* Increased from 600px */
     width: 100%;
     background: linear-gradient(145deg, var(--f1-dark-grey) 0%, var(--f1-carbon) 100%);
     box-shadow: 
@@ -87,7 +87,7 @@
 
 .sub-container__double-semi {
     border-radius: 10px;
-    height: 83vh;
+    height: 88vh; /* Increased from 83vh */
     width: 70%;
     background: linear-gradient(145deg, var(--f1-dark-grey) 0%, var(--f1-carbon) 100%);
     box-shadow: 
@@ -124,7 +124,7 @@
     border: 1px solid rgba(225, 6, 0, 0.3);
     overflow: hidden;
     border-radius: 10px;
-    height: 83vh;
+    height: 88vh; /* Increased from 83vh */
     padding: 20px;
     position: relative;
 }
@@ -141,7 +141,7 @@
 
 .sub-container__double-lg {
     border-radius: 10px;
-    height: 50vh;
+    height: 55vh; /* Increased from 50vh */
     width: 100%;
     background: linear-gradient(145deg, var(--f1-dark-grey) 0%, var(--f1-carbon) 100%);
     box-shadow: 
