@@ -429,7 +429,8 @@ const ProductList = () => {
 
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:8000/api/v1/product`);
+      // Fetch all products without pagination limits
+      const response = await axios.get(`http://localhost:8000/api/v1/product?limit=1000`);
 
       if (response.data.success) {
         const products = response.data.data;
@@ -481,16 +482,31 @@ const ProductList = () => {
     }
   }, [token]);
 
-  // Apply category filter
+  // Apply category filter and search - show all products by default when 'all' is selected
   useEffect(() => {
     let filtered = [...apiData];
 
+    // Apply category filter first
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(product => product.category?._id === categoryFilter);
     }
 
+    // Apply search filter
+    if (globalFilter && globalFilter.trim() !== '') {
+      const searchLower = globalFilter.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.name?.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.category?.name?.toLowerCase().includes(searchLower) ||
+        product.team?.name?.toLowerCase().includes(searchLower) ||
+        product._id?.toLowerCase().includes(searchLower)
+      );
+    }
+
     setFilteredData(filtered);
-  }, [categoryFilter, apiData]);
+    // Reset to first page when filters change
+    setFirst(0);
+  }, [categoryFilter, globalFilter, apiData]);
 
   // Export to CSV
   const exportToCSV = () => {
@@ -672,6 +688,7 @@ const ProductList = () => {
         placeholder: 'Enter Product Name',
         className: 'input-field',
         value: formState.name,
+        onChange: (e) => setFormState({ ...formState, name: e.target.value }),
         required: true,
       },
       {
@@ -680,6 +697,7 @@ const ProductList = () => {
         name: 'price',
         placeholder: 'Enter Price',
         value: formState.price,
+        onChange: (e) => setFormState({ ...formState, price: e.target.value }),
         required: true,
         min: 0,
         step: '0.01'
@@ -690,6 +708,7 @@ const ProductList = () => {
         name: 'description',
         placeholder: 'Enter Description',
         value: formState.description,
+        onChange: (e) => setFormState({ ...formState, description: e.target.value }),
         required: true,
       },
       {
@@ -697,6 +716,7 @@ const ProductList = () => {
         type: 'select',
         name: 'category',
         value: formState.category,
+        onChange: (e) => setFormState({ ...formState, category: e.target.value }),
         required: true,
         options: categories.map(cat => ({ value: cat._id, label: cat.name }))
       },
@@ -705,6 +725,7 @@ const ProductList = () => {
         type: 'select',
         name: 'team',
         value: formState.team,
+        onChange: (e) => setFormState({ ...formState, team: e.target.value }),
         required: true,
         options: teams.map(team => ({ value: team._id, label: team.name }))
       },
@@ -714,6 +735,7 @@ const ProductList = () => {
         name: 'stock',
         placeholder: 'Enter Stock Quantity',
         value: formState.stock,
+        onChange: (e) => setFormState({ ...formState, stock: e.target.value }),
         required: true,
         min: 0,
       },
@@ -722,6 +744,7 @@ const ProductList = () => {
         type: 'file',
         name: 'images',
         id: 'custom_file',
+        onChange: (e) => onChange(e),
         required: false,
         multiple: true,
       },
@@ -731,7 +754,7 @@ const ProductList = () => {
   // Calculate pagination values
   const totalRecords = filteredData.length;
   const currentPage = Math.floor(first / rows) + 1;
-  const totalPages = Math.ceil(totalRecords / rows);
+  const totalPages = Math.ceil(totalRecords / rows) || 1;
 
   // Paginated data for display
   const paginatedData = filteredData.slice(first, first + rows);
@@ -829,7 +852,6 @@ const ProductList = () => {
                     onSelectionChange={(e) => setSelectedProducts(e.value)}
                     dataKey="_id"
                     paginator={false}
-                    globalFilter={globalFilter}
                     responsiveLayout="scroll"
                     expandedRows={expandedRows}
                     onRowToggle={(e) => setExpandedRows(e.data)}
