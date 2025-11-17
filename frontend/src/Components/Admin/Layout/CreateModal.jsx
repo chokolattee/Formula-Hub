@@ -13,10 +13,10 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { FaArrowAltCircleRight, FaArrowAltCircleLeft } from "react-icons/fa";
 
 const CreateModal = forwardRef(({
-    setOpenModal, 
-    modalData: { title, content, fields }, 
-    handleSubmit: onSubmitHandler, 
-    imagesPreview, 
+    setOpenModal,
+    modalData: { title, content, fields },
+    handleSubmit: onSubmitHandler,
+    imagesPreview,
     setImagesPreview,
     validationSchema
 }, ref) => {
@@ -57,9 +57,9 @@ const CreateModal = forwardRef(({
 
     const handleFileChange = (e, onChange) => {
         const files = Array.from(e.target.files);
-        
+
         if (files.length === 0) return;
-        
+
         setImagesPreview([]);
         const newPreviews = [];
 
@@ -81,10 +81,10 @@ const CreateModal = forwardRef(({
 
     return (
         <div
-            ref={ref}  
+            ref={ref}
             className='modal-background'
             onClick={closeModals}
-            style={{ 
+            style={{
                 zIndex: 999,
                 position: 'fixed',
                 top: 0,
@@ -97,7 +97,7 @@ const CreateModal = forwardRef(({
             <div
                 className="modal-container"
                 onClick={(e) => e.stopPropagation()}
-                style={{ 
+                style={{
                     zIndex: 999,
                     position: 'relative'
                 }}
@@ -160,9 +160,9 @@ const CreateModal = forwardRef(({
                                         name={field.name}
                                         control={control}
                                         render={({ field: { onChange, value } }) => (
-                                            <FormControl 
-                                                fullWidth 
-                                                variant="outlined" 
+                                            <FormControl
+                                                fullWidth
+                                                variant="outlined"
                                                 error={!!errors[field.name]}
                                             >
                                                 <InputLabel id={`${field.name}-label`}>
@@ -174,6 +174,23 @@ const CreateModal = forwardRef(({
                                                     value={value}
                                                     onChange={onChange}
                                                     label={field.label}
+                                                    MenuProps={{
+                                                        PaperProps: {
+                                                            style: {
+                                                                maxHeight: 300,
+                                                                zIndex: 10000,
+                                                            },
+                                                        },
+                                                        anchorOrigin: {
+                                                            vertical: "bottom",
+                                                            horizontal: "left"
+                                                        },
+                                                        transformOrigin: {
+                                                            vertical: "top",
+                                                            horizontal: "left"
+                                                        },
+                                                        getContentAnchorEl: null,
+                                                    }}
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select {field.label}</em>
@@ -269,7 +286,7 @@ const CreateModal = forwardRef(({
                                             border: 'none',
                                             cursor: 'pointer'
                                         }}>
-                                            <FaArrowAltCircleRight style={{ color: 'var(--primary-color)', fontSize: '30px' }}/>
+                                            <FaArrowAltCircleRight style={{ color: 'var(--primary-color)', fontSize: '30px' }} />
                                         </button>
                                     )
                                 }
@@ -284,7 +301,7 @@ const CreateModal = forwardRef(({
                                             border: 'none',
                                             cursor: 'pointer'
                                         }}>
-                                            <FaArrowAltCircleLeft style={{ color: 'var(--primary-color)', fontSize: '30px' }}/>
+                                            <FaArrowAltCircleLeft style={{ color: 'var(--primary-color)', fontSize: '30px' }} />
                                         </button>
                                     )
                                 }

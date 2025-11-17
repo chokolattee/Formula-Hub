@@ -146,11 +146,11 @@ const ProductList = () => {
     setFormState({
       _id: '',
       name: '',
-      price: '',
+      price: 0,
       description: '',
       category: '',
       team: '',
-      stock: '',
+      stock: 0,
       images: [],
       existingImages: []
     });
@@ -159,6 +159,11 @@ const ProductList = () => {
 
   const loadModalCreate = () => {
     resetFormstate();
+    // Add a small delay to ensure categories and teams are loaded
+    if (categories.length === 0 || teams.length === 0) {
+      alert('Please wait for categories and teams to load');
+      return;
+    }
     setOpenModal(true);
   }
 
@@ -687,8 +692,7 @@ const ProductList = () => {
         name: 'name',
         placeholder: 'Enter Product Name',
         className: 'input-field',
-        value: formState.name,
-        onChange: (e) => setFormState({ ...formState, name: e.target.value }),
+        value: formState.name || '',
         required: true,
       },
       {
@@ -696,8 +700,7 @@ const ProductList = () => {
         type: 'number',
         name: 'price',
         placeholder: 'Enter Price',
-        value: formState.price,
-        onChange: (e) => setFormState({ ...formState, price: e.target.value }),
+        value: formState.price || 0,
         required: true,
         min: 0,
         step: '0.01'
@@ -707,35 +710,35 @@ const ProductList = () => {
         type: 'textarea',
         name: 'description',
         placeholder: 'Enter Description',
-        value: formState.description,
-        onChange: (e) => setFormState({ ...formState, description: e.target.value }),
+        value: formState.description || '',
         required: true,
       },
       {
         label: 'Category',
         type: 'select',
         name: 'category',
-        value: formState.category,
-        onChange: (e) => setFormState({ ...formState, category: e.target.value }),
+        value: formState.category || '',
         required: true,
-        options: categories.map(cat => ({ value: cat._id, label: cat.name }))
+        options: categories && categories.length > 0 
+          ? categories.map(cat => ({ value: cat._id, label: cat.name }))
+          : []
       },
       {
         label: 'Team',
         type: 'select',
         name: 'team',
-        value: formState.team,
-        onChange: (e) => setFormState({ ...formState, team: e.target.value }),
+        value: formState.team || '',
         required: true,
-        options: teams.map(team => ({ value: team._id, label: team.name }))
+        options: teams && teams.length > 0
+          ? teams.map(team => ({ value: team._id, label: team.name }))
+          : []
       },
       {
         label: 'Stock',
         type: 'number',
         name: 'stock',
         placeholder: 'Enter Stock Quantity',
-        value: formState.stock,
-        onChange: (e) => setFormState({ ...formState, stock: e.target.value }),
+        value: formState.stock || 0,
         required: true,
         min: 0,
       },
@@ -744,7 +747,6 @@ const ProductList = () => {
         type: 'file',
         name: 'images',
         id: 'custom_file',
-        onChange: (e) => onChange(e),
         required: false,
         multiple: true,
       },
@@ -1035,66 +1037,72 @@ const ProductList = () => {
         </div>
       </div>
 
-      {/* Modals with proper z-index */}
-      <CSSTransition
-        in={openModal}
-        timeout={300}
-        classNames="modal"
-        unmountOnExit
-        nodeRef={createRef}
-      >
-        <div style={{ position: 'fixed', zIndex: 9999 }}>
-          <CreateModal
-            ref={createRef}
-            setOpenModal={setOpenModal}
-            modalData={modalData}
-            handleSubmit={handleSubmit}
-            imagesPreview={imagesPreview}
-            setImagesPreview={setImagesPreview}
-            validationSchema={productSchema}
-          />
-        </div>
-      </CSSTransition>
+      {/* Modals with proper z-index and container */}
+      {openModal && (
+        <CSSTransition
+          in={openModal}
+          timeout={300}
+          classNames="modal"
+          unmountOnExit
+          nodeRef={createRef}
+        >
+          <div>
+            <CreateModal
+              ref={createRef}
+              setOpenModal={setOpenModal}
+              modalData={modalData}
+              handleSubmit={handleSubmit}
+              imagesPreview={imagesPreview}
+              setImagesPreview={setImagesPreview}
+              validationSchema={productSchema}
+            />
+          </div>
+        </CSSTransition>
+      )}
 
-      <CSSTransition
-        in={editModal}
-        timeout={300}
-        classNames="modal"
-        unmountOnExit
-        nodeRef={editRef}
-      >
-        <div style={{ position: 'fixed', zIndex: 9999 }}>
-          <EditModal
-            ref={editRef}
-            setOpenModal={setEditModal}
-            modalData={modalData}
-            handleUpdate={handleUpdate}
-            formState={formState}
-            imagesPreview={imagesPreview}
-            setImagesPreview={setImagesPreview}
-            validationSchema={productEditSchema}
-          />
-        </div>
-      </CSSTransition>
+      {editModal && (
+        <CSSTransition
+          in={editModal}
+          timeout={300}
+          classNames="modal"
+          unmountOnExit
+          nodeRef={editRef}
+        >
+          <div>
+            <EditModal
+              ref={editRef}
+              setOpenModal={setEditModal}
+              modalData={modalData}
+              handleUpdate={handleUpdate}
+              formState={formState}
+              imagesPreview={imagesPreview}
+              setImagesPreview={setImagesPreview}
+              validationSchema={productEditSchema}
+            />
+          </div>
+        </CSSTransition>
+      )}
 
-      <CSSTransition
-        in={infoModal}
-        timeout={300}
-        classNames="modal"
-        unmountOnExit
-        nodeRef={infoRef}
-      >
-        <div style={{ position: 'fixed', zIndex: 9999 }}>
-          <InfoModal
-            ref={infoRef}
-            setOpenModal={setInfoModal}
-            modalData={modalData}
-            formState={formState}
-            categories={categories}
-            teams={teams}
-          />
-        </div>
-      </CSSTransition>
+      {infoModal && (
+        <CSSTransition
+          in={infoModal}
+          timeout={300}
+          classNames="modal"
+          unmountOnExit
+          nodeRef={infoRef}
+        >
+          <div>
+            <InfoModal
+              ref={infoRef}
+              setOpenModal={setInfoModal}
+              modalData={modalData}
+              formState={formState}
+              categories={categories}
+              teams={teams}
+            />
+          </div>
+        </CSSTransition>
+      )}
     </>
   );
 }
