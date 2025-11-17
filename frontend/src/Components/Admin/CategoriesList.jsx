@@ -111,9 +111,12 @@ const CategoriesList = () => {
     
     setImagesPreview([]);
 
+    const fileObjects = []; 
     const newPreviews = [];
 
     files.forEach(file => {
+      fileObjects.push(file); 
+
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.readyState === 2) {
@@ -128,7 +131,7 @@ const CategoriesList = () => {
 
     setFormState((prevState) => ({
       ...prevState,
-      images: newPreviews,
+      images: fileObjects, 
     }));
   }
 
@@ -151,25 +154,17 @@ const CategoriesList = () => {
   const loadDataGen = async (id) => {
     try {
       const response = await axios.get(`http://localhost:8000/api/v1/admin/category/${id}`, getAxiosConfig());
-      const categoryData = response.data.data || response.data.category || response.data;
+      const categoryData = response.data.data;
       
-      if (!categoryData) {
-        throw new Error('No category data returned from API');
-      }
-
-      const cleanFormState = {
+      setFormState({
         _id: id,
-        name: categoryData.name || '',
-        description: categoryData.description || '',
-        images: [], 
-        existingImages: Array.isArray(categoryData.images) ? categoryData.images : []
-      };
+        name: categoryData.name,
+        description: categoryData.description,
+        images: [],
+        existingImages: categoryData.images || []
+      });
 
-      setFormState(cleanFormState);
-
-      const imagePreviews = (categoryData.images || []).map(image => 
-        typeof image === 'string' ? image : (image.url || image)
-      );
+      const imagePreviews = (categoryData.images || []).map(image => image.url);
       setImagesPreview(imagePreviews);
 
       return categoryData;
@@ -180,15 +175,13 @@ const CategoriesList = () => {
         alert('Unauthorized. Please log in as admin.');
         navigate('/login');
       } else {
-        alert('Failed to load category data: ' + (error.response?.data?.message || error.message));
+        alert('Failed to load category data');
       }
-      throw error;
     }
   }
 
   const loadDataByIdEdit = async (id) => {
     try {
-      resetFormstate();
       await loadDataGen(id);
       setEditModal(true);
     } catch (error) {
@@ -221,49 +214,53 @@ const CategoriesList = () => {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('name', validatedData.name);
-      formData.append('description', validatedData.description);
-  
-      if (validatedData.images && validatedData.images.length > 0) {
-        Array.from(validatedData.images).forEach((file) => {
-          formData.append('images', file);
-        });
-      }
-  
-      const response = await axios.post('http://localhost:8000/api/v1/category', formData, {
+      const base64Images = await Promise.all(
+        Array.from(validatedData.images).map(file => {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const categoryData = {
+        name: validatedData.name.trim(),
+        description: validatedData.description.trim(),
+        images: base64Images
+      };
+
+      console.log('Sending category data:', categoryData);
+
+      const response = await axios.post('http://localhost:8000/api/v1/category', categoryData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         timeout: 30000,
       });
-  
-      const newCategory = {
-        _id: response.data.data._id,
-        name: response.data.data.name,
-        description: response.data.data.description,
-        images: response.data.data.images,
-        createdAt: new Date().toLocaleString(),
-        updatedAt: new Date().toLocaleString(),
-      };
-      
-      setApiData((prevData) => [...prevData, newCategory]);
-      setOpenModal(false);
-      resetFormstate();
-      alert('Category created successfully!');
-  
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+
+      if (response.data.success) {
+        alert('Category created successfully!');
+        setOpenModal(false);
+        resetFormstate();
+        // Refresh the category list
+        const categoriesResponse = await axios.get('http://localhost:8000/api/v1/category');
+        if (categoriesResponse.data.success) {
+          setApiData(categoriesResponse.data.data);
+        }
+      }
     } catch (error) {
       console.error('Error creating category:', error);
-      
+      console.error('Error response:', error.response?.data);
+
       if (error.response?.status === 401 || error.response?.status === 403) {
         alert('Unauthorized. Please log in as admin.');
         navigate('/login');
       } else {
-        alert('Failed to create category: ' + (error.response?.data?.message || error.message));
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to create category';
+        alert('Failed to create category: ' + errorMessage);
       }
     }
   };
@@ -276,49 +273,47 @@ const CategoriesList = () => {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('name', validatedData.name);
-      formData.append('description', validatedData.description);
+      const categoryData = {
+        name: validatedData.name,
+        description: validatedData.description
+      };
 
       if (validatedData.images && validatedData.images.length > 0) {
-        Array.from(validatedData.images).forEach(file => {
-          if (file instanceof File) {
-            formData.append('images', file);
-          }
-        });
+        console.log('New images provided, replacing existing images');
+        categoryData.images = validatedData.images; // These are already base64 from EditModal
       } else {
-        if (formState.existingImages && formState.existingImages.length > 0) {
-          formData.append('existingImages', JSON.stringify(formState.existingImages));
-        }
+        console.log('No new images provided, keeping existing images');
+        categoryData.images = formState.existingImages; // Keep existing image objects
       }
-  
+
+      console.log('Updating category with data:', categoryData);
+
       const response = await axios.put(
         `http://localhost:8000/api/v1/category/${formState._id}`,
-        formData,
+        categoryData,
         {
           headers: { 
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          timeout: 60000,
+          timeout: 60000
         }
       );
-  
-      const updatedCategory = response.data.data;
-      setApiData(prevData =>
-        prevData.map(c => (c._id === updatedCategory._id ? updatedCategory : c))
-      );
-  
-      setEditModal(false);
-      resetFormstate();
-      alert('Category updated successfully!');
-  
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-  
+
+      if (response.data.success) {
+        alert('Category updated successfully!');
+        setEditModal(false);
+        resetFormstate();
+        // Refresh the category list
+        const categoriesResponse = await axios.get('http://localhost:8000/api/v1/category');
+        if (categoriesResponse.data.success) {
+          setApiData(categoriesResponse.data.data);
+        }
+      }
+
     } catch (error) {
       console.error('Error updating category:', error);
+      console.error('Error response:', error.response?.data);
       
       if (error.response?.status === 401 || error.response?.status === 403) {
         alert('Unauthorized. Please log in as admin.');
@@ -337,13 +332,21 @@ const CategoriesList = () => {
     }
 
     try {
-      await axios.delete(
+      const response = await axios.delete(
         `http://localhost:8000/api/v1/category/${id}`,
         getAxiosConfig()
       );
-      setApiData((prevData) => prevData.filter((data) => data._id !== id));
-      setSelectedCategories((prev) => prev.filter((cat) => cat._id !== id));
-      alert('Category deleted successfully!');
+      
+      if (response.data.success) {
+        setApiData((prevData) => prevData.filter((category) => category._id !== id));
+        setSelectedCategories((prev) => prev.filter((cat) => cat._id !== id));
+        alert('Category deleted successfully!');
+        // Refresh the category list to be sure
+        const categoriesResponse = await axios.get('http://localhost:8000/api/v1/category');
+        if (categoriesResponse.data.success) {
+          setApiData(categoriesResponse.data.data);
+        }
+      }
     } catch (error) {
       console.error('Error deleting category:', error);
       
@@ -351,7 +354,8 @@ const CategoriesList = () => {
         alert('Unauthorized. Please log in as admin.');
         navigate('/login');
       } else {
-        alert('Failed to delete category: ' + (error.response?.data?.message || error.message));
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to delete category';
+        alert('Failed to delete category: ' + errorMessage);
       }
     }
   };

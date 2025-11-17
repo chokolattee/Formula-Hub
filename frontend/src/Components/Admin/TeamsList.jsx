@@ -104,33 +104,36 @@ const Team = () => {
     }
   });
 
-  const onChange = e => {
-    const files = Array.from(e.target.files);
-    
-    if (files.length === 0) return;
-    
-    setImagesPreview([]);
+ const onChange = e => {
+  const files = Array.from(e.target.files);
+  
+  if (files.length === 0) return;
+  
+  setImagesPreview([]);
 
-    const newPreviews = [];
+  const fileObjects = []; // Store actual File objects
+  const newPreviews = [];
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.readyState === 2) {
-          newPreviews.push(reader.result);
-          if (newPreviews.length === files.length) {
-            setImagesPreview(newPreviews);
-          }
+  files.forEach(file => {
+    fileObjects.push(file); // Store the File object
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.readyState === 2) {
+        newPreviews.push(reader.result);
+        if (newPreviews.length === files.length) {
+          setImagesPreview(newPreviews);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    };
+    reader.readAsDataURL(file);
+  });
 
-    setFormState((prevState) => ({
-      ...prevState,
-      images: newPreviews,
-    }));
-  }
+  setFormState((prevState) => ({
+    ...prevState,
+    images: fileObjects, // Store File objects, not base64
+  }));
+}
 
   const resetFormstate = () => {
     setFormState({ 
@@ -148,39 +151,34 @@ const Team = () => {
     setOpenModal(true);
   }
 
-  const loadDataGen = async (id) => {
-    try {
-      const response = await axios.get(`http://localhost:8000/api/v1/team/${id}`);
-      const teamData = response.data.data;
+ const loadDataGen = async (id) => {
+  try {
+    const response = await axios.get(`http://localhost:8000/api/v1/team/${id}`, getAxiosConfig());
+    const teamData = response.data.data;
+    
+    setFormState({
+      _id: id,
+      name: teamData.name,
+      description: teamData.description,
+      images: [],
+      existingImages: teamData.images || []
+    });
 
-      const cleanFormState = {
-        _id: id,
-        name: teamData.name || '',
-        description: teamData.description || '',
-        images: [], 
-        existingImages: Array.isArray(teamData.images) ? teamData.images : []
-      };
+    const imagePreviews = (teamData.images || []).map(image => image.url);
+    setImagesPreview(imagePreviews);
 
-      setFormState(cleanFormState);
-
-      const imagePreviews = (teamData.images || []).map(image => 
-        typeof image === 'string' ? image : (image.url || image)
-      );
-      setImagesPreview(imagePreviews);
-
-      return teamData;
-    } catch (error) {
-      console.error('Error loading team data:', error);
-      
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert('Unauthorized. Please log in as admin.');
-        navigate('/login');
-      } else {
-        alert('Failed to load team data: ' + (error.response?.data?.message || error.message));
-      }
-      throw error;
+    return teamData;
+  } catch (error) {
+    console.error('Error loading team data:', error);
+    
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      alert('Unauthorized. Please log in as admin.');
+      navigate('/login');
+    } else {
+      alert('Failed to load team data');
     }
   }
+}
 
   const loadDataByIdEdit = async (id) => {
     try {
@@ -211,149 +209,162 @@ const Team = () => {
 
   // Handle Submit for CREATE
   const handleSubmit = async (validatedData) => {
-    if (!token) {
-      alert('Please log in to create teams');
-      navigate('/login');
-      return;
-    }
+  if (!token) {
+    alert('Please log in to create teams');
+    navigate('/login');
+    return;
+  }
 
-    try {
-      const formData = new FormData();
-      formData.append('name', validatedData.name);
-      formData.append('description', validatedData.description);
-
-      if (validatedData.images && validatedData.images.length > 0) {
-        Array.from(validatedData.images).forEach((file) => {
-          formData.append('images', file);
+  try {
+    // Convert File objects to base64
+    const base64Images = await Promise.all(
+      Array.from(validatedData.images).map(file => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
-      }
+      })
+    );
 
-      const response = await axios.post(
-        'http://localhost:8000/api/v1/team', 
-        formData, 
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
-          },
-          timeout: 30000,
-        }
-      );
+    const teamData = {
+      name: validatedData.name.trim(),
+      description: validatedData.description.trim(),
+      images: base64Images
+    };
 
-      const newTeam = {
-        _id: response.data.data._id,
-        name: response.data.data.name,
-        description: response.data.data.description,
-        images: response.data.data.images,
-        createdAt: new Date().toLocaleString(),
-        updatedAt: new Date().toLocaleString(),
-      };
-      
-      setApiData((prevData) => [...prevData, newTeam]);
+    console.log('Sending team data:', teamData);
+
+    const response = await axios.post('http://localhost:8000/api/v1/team/', teamData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      timeout: 30000,
+    });
+
+    if (response.data.success) {
+      alert('Team created successfully!');
       setOpenModal(false);
       resetFormstate();
-      alert('Team created successfully!');
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-    } catch (error) {
-      console.error('Error creating team:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert('Unauthorized. Please log in as admin.');
-        navigate('/login');
-      } else {
-        alert('Failed to create team: ' + (error.response?.data?.message || error.message));
+      // Refresh the team list
+      const teamsResponse = await axios.get('http://localhost:8000/api/v1/team');
+      if (teamsResponse.data.success) {
+        setApiData(teamsResponse.data.data);
       }
     }
-  };
+  } catch (error) {
+    console.error('Error creating team:', error);
+    console.error('Error response:', error.response?.data);
+
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      alert('Unauthorized. Please log in as admin.');
+      navigate('/login');
+    } else {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create team';
+      alert('Failed to create team: ' + errorMessage);
+    }
+  }
+};
 
   // Handle Update for EDIT
-  const handleUpdate = async (validatedData) => {
-    if (!token) {
-      alert('Please log in to update teams');
-      navigate('/login');
-      return;
+const handleUpdate = async (validatedData) => {
+  if (!token) {
+    alert('Please log in to update teams');
+    navigate('/login');
+    return;
+  }
+
+  try {
+    const teamData = {
+      name: validatedData.name,
+      description: validatedData.description
+    };
+
+    // KEY PART: Only process images if NEW files were uploaded
+    if (validatedData.images && validatedData.images.length > 0) {
+      console.log('New images provided, replacing existing images');
+      teamData.images = validatedData.images; // These are already base64 from EditModal
+    } else {
+      console.log('No new images provided, keeping existing images');
+      teamData.images = formState.existingImages; // Keep existing image objects
     }
 
-    try {
-      const formData = new FormData();
-      formData.append('name', validatedData.name);
-      formData.append('description', validatedData.description);
+    console.log('Updating team with data:', teamData);
 
-      if (validatedData.images && validatedData.images.length > 0) {
-        Array.from(validatedData.images).forEach(file => {
-          if (file instanceof File) {
-            formData.append('images', file);
-          }
-        });
-      } else {
-        if (formState.existingImages && formState.existingImages.length > 0) {
-          formData.append('existingImages', JSON.stringify(formState.existingImages));
-        }
+    const response = await axios.put(
+      `http://localhost:8000/api/v1/team/${formState._id}`,
+      teamData,
+      {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 60000
       }
+    );
 
-      const response = await axios.put(
-        `http://localhost:8000/api/v1/team/${formState._id}`,
-        formData,
-        {
-          headers: { 
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
-          },
-          timeout: 60000 
-        }
-      );
-
-      const updatedTeam = response.data.data;
-      setApiData(prevData =>
-        prevData.map(t => (t._id === updatedTeam._id ? updatedTeam : t))
-      );
-
+    if (response.data.success) {
+      alert('Team updated successfully!');
       setEditModal(false);
       resetFormstate();
-      alert('Team updated successfully!');
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-      
-    } catch (error) {
-      console.error('Error updating team:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert('Unauthorized. Please log in as admin.');
-        navigate('/login');
-      } else {
-        alert('Failed to update team: ' + (error.response?.data?.message || error.message));
+      // Refresh the team list
+      const teamsResponse = await axios.get('http://localhost:8000/api/v1/team');
+      if (teamsResponse.data.success) {
+        setApiData(teamsResponse.data.data);
       }
     }
-  };
 
-  const handleDelete = async (id) => {
-    if (!token) {
-      alert('Please log in to delete teams');
+  } catch (error) {
+    console.error('Error updating team:', error);
+    console.error('Error response:', error.response?.data);
+    
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      alert('Unauthorized. Please log in as admin.');
       navigate('/login');
-      return;
+    } else {
+      alert('Failed to update team: ' + (error.response?.data?.message || error.message));
     }
+  }
+};
 
-    try {
-      await axios.delete(
-        `http://localhost:8000/api/v1/team/${id}`,
-        getAxiosConfig()
-      );
-      setApiData((prevData) => prevData.filter((data) => data._id !== id));
+const handleDelete = async (id) => {
+  if (!token) {
+    alert('Please log in to delete teams');
+    navigate('/login');
+    return;
+  }
+
+  try {
+    const response = await axios.delete(
+      `http://localhost:8000/api/v1/team/${id}`,
+      getAxiosConfig()
+    );
+    
+    if (response.data.success) {
+      setApiData((prevData) => prevData.filter((team) => team._id !== id));
       setSelectedTeams((prev) => prev.filter((team) => team._id !== id));
       alert('Team deleted successfully!');
-    } catch (error) {
-      console.error('Error deleting team:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert('Unauthorized. Please log in as admin.');
-        navigate('/login');
-      } else {
-        alert('Failed to delete team: ' + (error.response?.data?.message || error.message));
+      // Refresh the team list to be sure
+      const teamsResponse = await axios.get('http://localhost:8000/api/v1/team');
+      if (teamsResponse.data.success) {
+        setApiData(teamsResponse.data.data);
       }
     }
-  };
+  } catch (error) {
+    console.error('Error deleting team:', error);
+    
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      alert('Unauthorized. Please log in as admin.');
+      navigate('/login');
+    } else {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete team';
+      alert('Failed to delete team: ' + errorMessage);
+    }
+  }
+};
+
 
   const bulkDelete = async () => {
     if (selectedTeams.length === 0) {

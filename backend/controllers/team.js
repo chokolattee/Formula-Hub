@@ -78,46 +78,51 @@ exports.createTeam = async (req, res) => {
       });
     }
 
-    let uploadedImages = [];
-    
-    if (req.files && req.files.length > 0) {
-      console.log('Processing', req.files.length, 'images...');
-      
-      for (const file of req.files) {
-        try {
-          const result = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.v2.uploader.upload_stream(
-              {
-                folder: 'Teams',
-                width: 500,
-                height: 500,
-                crop: 'scale',
-              },
-              (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-              }
-            );
-            
-            uploadStream.end(file.buffer);
-          });
-          
-          uploadedImages.push({
-            public_id: result.public_id,
-            url: result.secure_url,
-          });
-          
-          console.log('Uploaded image:', result.secure_url);
-        } catch (uploadErr) {
-          console.error('Error uploading image:', uploadErr);
-        }
+    // Handle base64 images from request body
+    let images = [];
+    if (typeof req.body.images === 'string') {
+      images.push(req.body.images);
+    } else if (Array.isArray(req.body.images)) {
+      images = req.body.images;
+    }
+
+    if (images.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide at least one team image.',
+      });
+    }
+
+    // Upload base64 images to Cloudinary
+    let imagesLinks = [];
+    for (let i = 0; i < images.length; i++) {
+      try {
+        const result = await cloudinary.v2.uploader.upload(images[i], {
+          folder: 'Teams',
+          width: 500,
+          height: 500,
+          crop: 'scale',
+        });
+
+        imagesLinks.push({
+          public_id: result.public_id,
+          url: result.secure_url,
+        });
+
+        console.log('Uploaded image:', result.secure_url);
+      } catch (uploadErr) {
+        console.error('Error uploading image:', uploadErr);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload images to Cloudinary.',
+        });
       }
     }
 
     const newTeam = await Team.create({
       name,
       description,
-      images: uploadedImages,
+      images: imagesLinks,
     });
 
     return res.status(201).json({
@@ -137,168 +142,156 @@ exports.createTeam = async (req, res) => {
 };
 
 exports.updateTeam = async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Team ID',
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid Team ID format.' 
       });
     }
 
-    const team = await Team.findById(id);
-    if (!team) {
-      return res.status(404).json({
-        success: false,
-        message: 'Team not found.',
+    // Check if team exists
+    const existingTeam = await Team.findById(id);
+    if (!existingTeam) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Team not found.' 
       });
     }
 
-    const { name, description, existingImages } = req.body;
-    const updateData = { name, description };
+    const { name, description } = req.body;
 
-    if (req.files && req.files.length > 0) {
-      console.log('Processing', req.files.length, 'new images...');
-      
-      const uploadPromises = req.files.map(file => {
-        return new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.v2.uploader.upload_stream(
-            {
+    if (!name || !description) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide all required fields.' 
+      });
+    }
+
+    let imagesLinks = existingTeam.images; // Keep existing images by default
+
+    if (req.body.images && Array.isArray(req.body.images)) {
+      if (req.body.images.length > 0 && typeof req.body.images[0] === 'string') {
+        // New images are being uploaded (base64 strings) - delete old images from Cloudinary
+        if (existingTeam.images && existingTeam.images.length > 0) {
+          for (let i = 0; i < existingTeam.images.length; i++) {
+            try {
+              if (existingTeam.images[i].public_id) {
+                await cloudinary.v2.uploader.destroy(existingTeam.images[i].public_id);
+                console.log(`Deleted old image: ${existingTeam.images[i].public_id}`);
+              }
+            } catch (error) {
+              console.log(`Failed to delete old image:`, error.message);
+            }
+          }
+        }
+
+        // Upload new images
+        imagesLinks = [];
+        for (let i = 0; i < req.body.images.length; i++) {
+          try {
+            const result = await cloudinary.v2.uploader.upload(req.body.images[i], {
               folder: 'Teams',
               width: 500,
               height: 500,
               crop: 'scale',
-            },
-            (error, result) => {
-              if (error) {
-                console.error('Cloudinary upload error:', error);
-                reject(error);
-              } else {
-                console.log('Successfully uploaded to Cloudinary:', result.secure_url);
-                resolve({
-                  public_id: result.public_id,
-                  url: result.secure_url,
-                });
-              }
-            }
-          );
-          
-          uploadStream.end(file.buffer);
-        });
-      });
+            });
 
-      try {
-        // Upload all new images to Cloudinary
-        const uploadResults = await Promise.all(uploadPromises);
-        console.log('All images uploaded successfully');
+            imagesLinks.push({
+              public_id: result.public_id,
+              url: result.secure_url
+            });
 
-        // Delete old images from Cloudinary
-        if (team.images && team.images.length > 0) {
-          console.log('Deleting', team.images.length, 'old images from Cloudinary...');
-          const deletePromises = team.images.map(img => {
-            if (img.public_id) {
-              return cloudinary.v2.uploader.destroy(img.public_id)
-                .then(() => console.log('Deleted old image:', img.public_id))
-                .catch(err => {
-                  console.warn('Could not delete old image:', img.public_id, err.message);
-                });
-            }
-            return Promise.resolve();
-          });
-          await Promise.allSettled(deletePromises);
+          } catch (error) {
+            console.log("Image upload error:", error);
+            return res.status(500).json({
+              success: false,
+              message: "Failed to upload images to Cloudinary."
+            });
+          }
         }
-
-        // Set new images (replaces all old images)
-        updateData.images = uploadResults;
-      } catch (uploadError) {
-        console.error('Error uploading images to Cloudinary:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to upload images to Cloudinary',
-          error: uploadError.message
-        });
+      } else if (req.body.images[0] && req.body.images[0].public_id) {
+        // Existing images (objects with public_id)
+        imagesLinks = req.body.images;
       }
-    } else if (existingImages) {
-      // Keep existing images
-      try {
-        const parsedImages = JSON.parse(existingImages);
-        console.log('Preserving', parsedImages.length, 'existing images');
-        updateData.images = parsedImages;
-      } catch (parseError) {
-        console.error('Error parsing existingImages:', parseError);
-        updateData.images = team.images;
-      }
-    } else {
-      // No new images, keep current images
-      console.log('No new images provided, keeping current images');
-      updateData.images = team.images;
     }
 
-    const updatedTeam = await Team.findByIdAndUpdate(id, updateData, {
+    const updateData = {
+      name: name.trim(),
+      description: description.trim(),
+      images: imagesLinks
+    };
+
+    const updatedTeam = await Team.findByIdAndUpdate(id, updateData, { 
       new: true,
-      runValidators: true,
+      runValidators: true 
     });
 
-    console.log('Team updated successfully:', updatedTeam._id);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Team updated successfully.',
+    res.status(200).json({ 
+      success: true, 
       data: updatedTeam,
+      message: "Team updated successfully." 
     });
+
   } catch (error) {
-    console.error('Error updating team:', error);
-    
-    return res.status(500).json({
-      success: false,
-      message: 'Server Error: Unable to update team.',
-      error: error.message
+    console.error("Error in Update Team:", error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server Error: " + error.message 
     });
   }
 };
 
 exports.deleteTeam = async (req, res) => {
+  const { id } = req.params;
+  
   try {
-    const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Team ID',
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid Team ID format.' 
       });
     }
 
+    // Find the team first to get image public_ids
     const team = await Team.findById(id);
+
     if (!team) {
-      return res.status(404).json({
-        success: false,
-        message: 'Team not found.',
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Team not found.' 
       });
     }
 
-    // Delete images from Cloudinary in parallel
+    // Delete images from Cloudinary
     if (team.images && team.images.length > 0) {
-      const deletePromises = team.images.map(image =>
-        cloudinary.v2.uploader.destroy(image.public_id)
-          .then(() => console.log('Deleted image from Cloudinary:', image.public_id))
-          .catch(error => console.error('Error deleting image from Cloudinary:', error))
-      );
-      await Promise.all(deletePromises);
+      for (let i = 0; i < team.images.length; i++) {
+        try {
+          if (team.images[i].public_id) {
+            await cloudinary.v2.uploader.destroy(team.images[i].public_id);
+            console.log(`Deleted image: ${team.images[i].public_id}`);
+          }
+        } catch (error) {
+          console.log(`Failed to delete image ${team.images[i].public_id}:`, error.message);
+        }
+      }
     }
 
-    // Delete team from database
-    await team.deleteOne();
+    // Delete the team from database
+    await Team.findByIdAndDelete(id);
 
-    return res.status(200).json({
-      success: true,
-      message: 'Team deleted successfully.',
+    res.status(200).json({ 
+      success: true, 
+      message: "Team deleted successfully." 
     });
+    
   } catch (error) {
-    console.error('Error deleting team:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server Error: Unable to delete team.',
+    console.error("Error in Delete Team:", error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server Error: " + error.message 
     });
   }
 };
