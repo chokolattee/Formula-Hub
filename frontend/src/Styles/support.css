@@ -1,0 +1,450 @@
+/* Support Page - F1 Racing Theme */
+
+/* Hero Section */
+.support-hero {
+    position: relative;
+    margin-top: 80px;
+    height: 400px;
+    background: linear-gradient(135deg, var(--f1-black) 0%, var(--f1-dark-gray) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.support-hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    animation: fadeInUp 1s ease-out;
+}
+
+.support-hero-icon {
+    font-size: 80px;
+    border-top: 100px;
+    color: var(--f1-red);
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.support-hero-title {
+    font-family: var(--f1-display-font);
+    font-size: 72px;
+    color: var(--f1-white);
+    letter-spacing: 10px;
+    margin: 0;
+    text-shadow: 4px 4px 0 var(--f1-red);
+}
+
+.support-hero-subtitle {
+    font-family: var(--f1-body-font);
+    font-size: 24px;
+    color: var(--f1-light-gray);
+    letter-spacing: 4px;
+    margin-top: 20px;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Container */
+.support-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Section Title */
+.section-title {
+    font-family: var(--f1-display-font);
+    font-size: 48px;
+    color: var(--f1-black);
+    letter-spacing: 6px;
+    text-align: center;
+    margin-bottom: 60px;
+    position: relative;
+}
+
+.section-title::after {
+    content: '';
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 4px;
+    background: var(--f1-red);
+}
+
+/* Quick Help Section */
+.quick-help-section {
+    padding: 80px 20px;
+    background: var(--f1-white);
+}
+
+.quick-help-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 40px;
+}
+
+.help-card {
+    background: var(--f1-black);
+    padding: 40px 30px;
+    text-align: center;
+    border: 3px solid var(--f1-red);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.help-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(220, 0, 0, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.help-card:hover::before {
+    left: 100%;
+}
+
+.help-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(220, 0, 0, 0.3);
+}
+
+.help-icon {
+    font-size: 50px;
+    color: var(--f1-red);
+    margin-bottom: 20px;
+}
+
+.help-card h3 {
+    font-family: var(--f1-heading-font);
+    font-size: 24px;
+    color: var(--f1-white);
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+}
+
+.help-card p {
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    color: var(--f1-light-gray);
+    line-height: 1.6;
+}
+
+/* FAQ Section */
+.faq-section {
+    padding: 80px 20px;
+    background: var(--f1-light-gray);
+}
+
+.faq-section .section-title {
+    color: var(--f1-black);
+}
+
+.faq-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+}
+
+.faq-item {
+    background: var(--f1-white);
+    padding: 30px;
+    border-left: 4px solid var(--f1-red);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.faq-item:hover {
+    transform: translateX(10px);
+    box-shadow: 0 6px 20px rgba(220, 0, 0, 0.2);
+}
+
+.faq-question {
+    font-family: var(--f1-heading-font);
+    font-size: 18px;
+    color: var(--f1-black);
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+}
+
+.faq-answer {
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    color: var(--f1-dark-gray);
+    line-height: 1.7;
+}
+
+/* Contact Section */
+.contact-section {
+    padding: 80px 20px;
+    background: var(--f1-black);
+}
+
+.contact-section .section-title {
+    color: var(--f1-white);
+}
+
+.contact-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    margin-top: 60px;
+}
+
+/* Contact Info */
+.contact-info {
+    color: var(--f1-white);
+}
+
+.contact-title {
+    font-family: var(--f1-display-font);
+    font-size: 42px;
+    color: var(--f1-red);
+    letter-spacing: 4px;
+    margin-bottom: 20px;
+}
+
+.contact-description {
+    font-family: var(--f1-body-font);
+    font-size: 18px;
+    color: var(--f1-light-gray);
+    margin-bottom: 40px;
+    line-height: 1.6;
+}
+
+.contact-details {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.contact-icon {
+    font-size: 28px;
+    color: var(--f1-red);
+    margin-top: 5px;
+}
+
+.contact-item h4 {
+    font-family: var(--f1-heading-font);
+    font-size: 18px;
+    color: var(--f1-white);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+}
+
+.contact-item p {
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    color: var(--f1-light-gray);
+}
+
+.support-hours {
+    background: var(--f1-dark-gray);
+    padding: 25px;
+    border-left: 4px solid var(--f1-red);
+}
+
+.support-hours h4 {
+    font-family: var(--f1-heading-font);
+    font-size: 20px;
+    color: var(--f1-red);
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+}
+
+.support-hours p {
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    color: var(--f1-light-gray);
+    margin-bottom: 8px;
+}
+
+/* Contact Form */
+.contact-form-wrapper {
+    background: var(--f1-dark-gray);
+    padding: 40px;
+    border: 3px solid var(--f1-red);
+}
+
+.form-title {
+    font-family: var(--f1-display-font);
+    font-size: 32px;
+    color: var(--f1-white);
+    letter-spacing: 3px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    color: var(--f1-white);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 15px;
+    font-family: var(--f1-body-font);
+    font-size: 16px;
+    background: var(--f1-black);
+    border: 2px solid var(--f1-red);
+    color: var(--f1-white);
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--f1-white);
+    box-shadow: 0 0 10px rgba(220, 0, 0, 0.3);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 18px;
+    font-family: var(--f1-display-font);
+    font-size: 20px;
+    letter-spacing: 3px;
+    background: var(--f1-red);
+    color: var(--f1-white);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: var(--f1-white);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.5s ease, height 0.5s ease;
+    opacity: 0.2;
+}
+
+.submit-btn:hover::before {
+    width: 300%;
+    height: 300%;
+}
+
+.submit-btn:hover {
+    background: var(--f1-dark-red);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(220, 0, 0, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+    .contact-wrapper {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+
+    .support-hero-title {
+        font-size: 56px;
+    }
+}
+
+@media (max-width: 768px) {
+    .support-hero {
+        height: 350px;
+    }
+
+    .support-hero-title {
+        font-size: 42px;
+        letter-spacing: 6px;
+    }
+
+    .support-hero-subtitle {
+        font-size: 18px;
+    }
+
+    .section-title {
+        font-size: 36px;
+    }
+
+    .quick-help-grid,
+    .faq-grid {
+        grid-template-columns: 1fr;
+        gap: 25px;
+    }
+
+    .contact-form-wrapper {
+        padding: 30px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .support-hero {
+        height: 300px;
+    }
+
+    .support-hero-title {
+        font-size: 32px;
+    }
+
+    .section-title {
+        font-size: 28px;
+    }
+
+    .help-card {
+        padding: 30px 20px;
+    }
+
+    .faq-item {
+        padding: 20px;
+    }
+}

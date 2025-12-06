@@ -1,23 +1,23 @@
-import React, { useState, useEffect } from 'react'
-import '../../App.css'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getUser, logout } from '../Utils/helpers'
-import { toast } from 'react-toastify'
+import React, { useState, useEffect } from 'react';
+import '../../App.css';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { getUser, logout } from '../Utils/helpers';
+import { toast } from 'react-toastify';
 import { FaSearch, FaShoppingBag, FaUser, FaSignInAlt } from "react-icons/fa";
 import Sidebar from '../Admin/Layout/SideBar';
 
 const Header = ({ cartItems }) => {
-    const [user, setUser] = useState({})
-    const [isScrolled, setIsScrolled] = useState(false)
-    const [dropdownOpen, setDropdownOpen] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
-    const navigate = useNavigate()
-    const location = useLocation()
+    const [user, setUser] = useState({});
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const logoutHandler = () => {
         logout(navigate('/'));
         toast.success('Logged out successfully', { position: 'bottom-right' });
-    }
+    };
 
     const handleScroll = () => setIsScrolled(window.scrollY >= 800);
 
@@ -25,23 +25,23 @@ const Header = ({ cartItems }) => {
         if (e.key === 'Enter' && searchQuery.trim()) {
             navigate(`/search/${encodeURIComponent(searchQuery)}`);
         }
-    }
+    };
 
     useEffect(() => {
-        setUser(getUser())
-        window.addEventListener('scroll', handleScroll)
-        return () => window.removeEventListener('scroll', handleScroll)
-    }, [])
+        setUser(getUser());
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
    
     useEffect(() => {
         if (location.pathname === '/') {
-            setSearchQuery('')
+            setSearchQuery('');
         }
-    }, [location.pathname])
+    }, [location.pathname]);
 
     if (user?.role === 'admin') {
-        return <Sidebar />
+        return <Sidebar />;
     }
 
     return (
@@ -257,7 +257,7 @@ const Header = ({ cartItems }) => {
                 .login-icon-link {
                     color: white;
                     background: transparent;
-                    font-size: 20px;
+                    font-size: 35px;
                     cursor: pointer;
                     transition: all 0.3s ease;
                     padding: 0.5rem;
@@ -425,7 +425,7 @@ const Header = ({ cartItems }) => {
 
                     .icon-link,
                     .login-icon-link {
-                        font-size: 18px;
+                        font-size: 35px;
                     }
 
                     .search-input {
@@ -438,7 +438,7 @@ const Header = ({ cartItems }) => {
                 }
             `}</style>
         </div>
-    )
-}
+    );
+};
 
-export default Header
+export default Header;

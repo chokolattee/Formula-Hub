@@ -1,26 +1,27 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import MetaData from '../Layout/MetaData'
-import Loader from '../Layout/Loader'
-import Sidebar from './Layout/SideBar'
+import MetaData from '../Layout/MetaData';
+import Loader from '../Layout/Loader';
+import Sidebar from './Layout/SideBar';
 import { getToken } from '../Utils/helpers';
-import axios from 'axios'
+import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
+    LineChart,
+    Line,
+    BarChart,
+    Bar,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
 } from 'recharts';
 import { Box, Button, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, Paper, Typography, Grid } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -29,19 +30,19 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const Dashboard = () => {
-    const [products, setProducts] = useState([])
-    const [error, setError] = useState('')
-    const [orders, setOrders] = useState([])
-    const [users, setUsers] = useState([])
-    const [reviews, setReviews] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [totalAmount, setTotalAmount] = useState(0)
+    const [products, setProducts] = useState([]);
+    const [error, setError] = useState('');
+    const [orders, setOrders] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [reviews, setReviews] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [totalAmount, setTotalAmount] = useState(0);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    
+
     // Date range filters
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    
+
     // Chart selection for PDF export
     const [selectedCharts, setSelectedCharts] = useState({
         sales: true,
@@ -50,7 +51,7 @@ const Dashboard = () => {
         categories: true,
         orderStatus: true
     });
-    
+
     // Chart refs for PDF export
     const salesChartRef = useRef(null);
     const yearlySalesChartRef = useRef(null);
@@ -67,7 +68,7 @@ const Dashboard = () => {
     const [outOfStockCount, setOutOfStockCount] = useState(0);
 
     // Fetch all dashboard data from the new API endpoint
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         try {
             const params = {};
             if (startDate) params.startDate = startDate;
@@ -75,7 +76,7 @@ const Dashboard = () => {
 
             const { data } = await axios.get(
                 `${import.meta.env.VITE_API}/admin/dashboard`,
-                { 
+                {
                     params,
                     headers: {
                         'Authorization': `Bearer ${getToken()}`
@@ -83,109 +84,115 @@ const Dashboard = () => {
                 }
             );
 
-            if (data.success) {
-                // Set stats
-                const stats = data.data.stats;
+            if (data && data.success) {
+                // Set stats with safe fallbacks
+                const stats = data.data?.stats || {};
                 setTotalAmount(stats.totalSales || 0);
-                
+
                 // Set counts for cards
-                setProducts(Array(stats.totalProducts).fill({})); // Create dummy array for count
-                setOrders(Array(stats.totalOrders).fill({}));
-                setUsers(Array(stats.totalUsers).fill({}));
-                
-                // Store the actual chart data
-                setMonthlySalesData(data.data.monthlySales || []);
-                setYearlySalesData(data.data.yearlySales || []); // NEW: Yearly sales data
-                setTopProductsData(data.data.topProducts || []);
-                setCategoryData(data.data.categoryDistribution || []);
-                setOrderStatusData(data.data.orderStatusDistribution || []);
-                
+                setProducts(Array(stats.totalProducts || 0).fill({}));
+                setOrders(Array(stats.totalOrders || 0).fill({}));
+                setUsers(Array(stats.totalUsers || 0).fill({}));
+
+                // Store the actual chart data with safe fallbacks
+                setMonthlySalesData(data.data?.monthlySales || []);
+                setYearlySalesData(data.data?.yearlySales || []);
+                setTopProductsData(data.data?.topProducts || []);
+                setCategoryData(data.data?.categoryDistribution || []);
+                setOrderStatusData(data.data?.orderStatusDistribution || []);
+
                 // Store out of stock count
                 setOutOfStockCount(stats.outOfStock || 0);
             }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
-            toast.error('Error loading dashboard data');
+            setError('Error loading dashboard data');
+            toast.error(error.response?.data?.message || 'Error loading dashboard data');
         }
-    }
+    }, [startDate, endDate]);
 
     // Chart data functions now return data from API
     const getSalesChartData = () => {
         return monthlySalesData;
-    }
+    };
 
     const getYearlySalesChartData = () => {
         return yearlySalesData;
-    }
+    };
 
     const getMostOrderedProductsData = () => {
         return topProductsData;
-    }
+    };
 
     const getCategoryChartData = () => {
         return categoryData;
-    }
+    };
 
     const getOrderStatusChartData = () => {
         return orderStatusData;
-    }
+    };
 
     // Colors for pie charts
     const COLORS = ['#e10600', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'];
 
     // Export charts to PDF
     const exportToPDF = async () => {
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        let yPosition = 20;
-        
-        pdf.setFontSize(18);
-        pdf.text('Dashboard Report', 105, yPosition, { align: 'center' });
-        yPosition += 10;
-        
-        pdf.setFontSize(11);
-        pdf.text(`Generated: ${new Date().toLocaleString()}`, 105, yPosition, { align: 'center' });
-        yPosition += 5;
-        
-        if (startDate || endDate) {
-            const dateRange = `Date Range: ${startDate || 'Start'} to ${endDate || 'End'}`;
-            pdf.text(dateRange, 105, yPosition, { align: 'center' });
+        try {
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let yPosition = 20;
+
+            pdf.setFontSize(18);
+            pdf.text('Dashboard Report', 105, yPosition, { align: 'center' });
             yPosition += 10;
-        } else {
-            yPosition += 10;
-        }
-        
-        const charts = [
-            { ref: salesChartRef, selected: selectedCharts.sales, title: 'Monthly Sales' },
-            { ref: yearlySalesChartRef, selected: selectedCharts.yearlySales, title: 'Yearly Sales' },
-            { ref: productsChartRef, selected: selectedCharts.products, title: 'Most Ordered Products' },
-            { ref: categoriesChartRef, selected: selectedCharts.categories, title: 'Product Categories' },
-            { ref: orderStatusChartRef, selected: selectedCharts.orderStatus, title: 'Order Status' }
-        ];
-        
-        for (const chart of charts) {
-            if (chart.selected && chart.ref.current) {
-                const canvas = await html2canvas(chart.ref.current);
-                const imgData = canvas.toDataURL('image/png');
-                
-                if (yPosition > 250) {
-                    pdf.addPage();
-                    yPosition = 20;
-                }
-                
-                pdf.setFontSize(14);
-                pdf.text(chart.title, 105, yPosition, { align: 'center' });
+
+            pdf.setFontSize(11);
+            pdf.text(`Generated: ${new Date().toLocaleString()}`, 105, yPosition, { align: 'center' });
+            yPosition += 5;
+
+            if (startDate || endDate) {
+                const dateRange = `Date Range: ${startDate || 'Start'} to ${endDate || 'End'}`;
+                pdf.text(dateRange, 105, yPosition, { align: 'center' });
                 yPosition += 10;
-                
-                const imgWidth = 170;
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
-                yPosition += imgHeight + 15;
+            } else {
+                yPosition += 10;
             }
+
+            const charts = [
+                { ref: salesChartRef, selected: selectedCharts.sales, title: 'Monthly Sales' },
+                { ref: yearlySalesChartRef, selected: selectedCharts.yearlySales, title: 'Yearly Sales' },
+                { ref: productsChartRef, selected: selectedCharts.products, title: 'Most Ordered Products' },
+                { ref: categoriesChartRef, selected: selectedCharts.categories, title: 'Product Categories' },
+                { ref: orderStatusChartRef, selected: selectedCharts.orderStatus, title: 'Order Status' }
+            ];
+
+            for (const chart of charts) {
+                if (chart.selected && chart.ref.current) {
+                    const canvas = await html2canvas(chart.ref.current);
+                    const imgData = canvas.toDataURL('image/png');
+
+                    if (yPosition > 250) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+
+                    pdf.setFontSize(14);
+                    pdf.text(chart.title, 105, yPosition, { align: 'center' });
+                    yPosition += 10;
+
+                    const imgWidth = 170;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 15;
+                }
+            }
+
+            pdf.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
+            toast.success('Dashboard exported to PDF');
+        } catch (error) {
+            console.error('Error exporting to PDF:', error);
+            toast.error('Error exporting dashboard to PDF');
         }
-        
-        pdf.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
-        toast.success('Dashboard exported to PDF');
-    }
+    };
 
     // Auto-open sidebar on desktop
     useEffect(() => {
@@ -208,17 +215,17 @@ const Dashboard = () => {
             await fetchDashboardData();
             setLoading(false);
         };
-        
+
         loadDashboard();
-    }, [startDate, endDate])
+    }, [fetchDashboardData]);
 
     return (
         <>
             <MetaData title={'Admin Dashboard'} />
-            
+
             <div className="admin-layout">
                 {/* Hamburger menu button */}
-                <button 
+                <button
                     className="sidebar-toggle-btn"
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 >
@@ -241,8 +248,8 @@ const Dashboard = () => {
                                         <div className="card text-white bg-primary o-hidden h-100">
                                             <div className="card-body">
                                                 <div className="text-center card-font-size">
-                                                    Total Sales<br /> 
-                                                    <b>₱{totalAmount.toFixed ? totalAmount.toFixed(2) : '0.00'}</b>
+                                                    Total Sales<br />
+                                                    <b>₱{typeof totalAmount === 'number' ? totalAmount.toFixed(2) : '0.00'}</b>
                                                 </div>
                                             </div>
                                         </div>
@@ -254,7 +261,7 @@ const Dashboard = () => {
                                         <div className="card text-white bg-success o-hidden h-100">
                                             <div className="card-body">
                                                 <div className="text-center card-font-size">
-                                                    Products<br /> 
+                                                    Products<br />
                                                     <b>{products.length}</b>
                                                 </div>
                                             </div>
@@ -269,7 +276,7 @@ const Dashboard = () => {
                                         <div className="card text-white bg-danger o-hidden h-100">
                                             <div className="card-body">
                                                 <div className="text-center card-font-size">
-                                                    Orders<br /> 
+                                                    Orders<br />
                                                     <b>{orders.length}</b>
                                                 </div>
                                             </div>
@@ -284,7 +291,7 @@ const Dashboard = () => {
                                         <div className="card text-white bg-info o-hidden h-100">
                                             <div className="card-body">
                                                 <div className="text-center card-font-size">
-                                                    Users<br /> 
+                                                    Users<br />
                                                     <b>{users.length}</b>
                                                 </div>
                                             </div>
@@ -299,7 +306,7 @@ const Dashboard = () => {
                                         <div className="card text-white bg-warning o-hidden h-100">
                                             <div className="card-body">
                                                 <div className="text-center card-font-size">
-                                                    Out of Stock<br /> 
+                                                    Out of Stock<br />
                                                     <b>{outOfStockCount}</b>
                                                 </div>
                                             </div>
@@ -308,7 +315,14 @@ const Dashboard = () => {
                                 </div>
 
                                 {/* Date Range Filter & Export */}
-                                <Paper sx={{ p: 3, mb: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
+                                <Paper sx={{ 
+                                    p: 3, 
+                                    mb: 3, 
+                                    background: 'linear-gradient(145deg, #ffffff 0%, #f5f5f5 100%)',
+                                    border: '2px solid #dc0000',
+                                    borderRadius: '10px',
+                                    boxShadow: '0 8px 20px rgba(220, 0, 0, 0.2)'
+                                }}>
                                     <Grid container spacing={2} alignItems="center">
                                         <Grid item xs={12} md={3}>
                                             <TextField
@@ -319,6 +333,12 @@ const Dashboard = () => {
                                                 InputLabelProps={{ shrink: true }}
                                                 fullWidth
                                                 size="small"
+                                                sx={{
+                                                    '& .MuiInputBase-root': {
+                                                        backgroundColor: '#0b0a0aff !important',
+                                                        color: '#eee2e2ff !important '
+                                                    }
+                                                }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} md={3}>
@@ -330,6 +350,12 @@ const Dashboard = () => {
                                                 InputLabelProps={{ shrink: true }}
                                                 fullWidth
                                                 size="small"
+                                                sx={{
+                                                    '& .MuiInputBase-root': {
+                                                        backgroundColor: '#040303ff !important',
+                                                         color: '#eee2e2ff !important '
+                                                    }
+                                                }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} md={6}>
@@ -338,6 +364,15 @@ const Dashboard = () => {
                                                     variant="outlined"
                                                     size="small"
                                                     onClick={() => { setStartDate(''); setEndDate(''); }}
+                                                    sx={{
+                                                        borderColor: '#dc0000',
+                                                        color: '#dc0000',
+                                                        fontWeight: 600,
+                                                        '&:hover': {
+                                                            borderColor: '#b00500',
+                                                            backgroundColor: 'rgba(220, 0, 0, 0.1)'
+                                                        }
+                                                    }}
                                                 >
                                                     Clear Filters
                                                 </Button>
@@ -346,34 +381,82 @@ const Dashboard = () => {
                                                     startIcon={<PictureAsPdfIcon />}
                                                     onClick={exportToPDF}
                                                     size="small"
-                                                    sx={{ backgroundColor: '#e10600', '&:hover': { backgroundColor: '#b00500' } }}
+                                                    sx={{ 
+                                                        backgroundColor: '#dc0000', 
+                                                        fontWeight: 600,
+                                                        '&:hover': { 
+                                                            backgroundColor: '#b00500' 
+                                                        } 
+                                                    }}
                                                 >
                                                     Export to PDF
                                                 </Button>
                                             </Box>
                                         </Grid>
                                         <Grid item xs={12}>
-                                            <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Charts to Export:</Typography>
+                                            <Typography variant="subtitle2" sx={{ 
+                                                mb: 1, 
+                                                color: '#15151e',
+                                                fontWeight: 600,
+                                                fontSize: '14px'
+                                            }}>
+                                                Select Charts to Export:
+                                            </Typography>
                                             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                                 <FormControlLabel
-                                                    control={<Checkbox checked={selectedCharts.sales} onChange={(e) => setSelectedCharts({...selectedCharts, sales: e.target.checked})} />}
+                                                    control={
+                                                        <Checkbox 
+                                                            checked={selectedCharts.sales} 
+                                                            onChange={(e) => setSelectedCharts({ ...selectedCharts, sales: e.target.checked })} 
+                                                            sx={{ color: '#dc0000', '&.Mui-checked': { color: '#dc0000' } }}
+                                                        />
+                                                    }
                                                     label="Monthly Sales"
+                                                    sx={{ '& .MuiFormControlLabel-label': { color: '#15151e', fontWeight: 500 } }}
                                                 />
                                                 <FormControlLabel
-                                                    control={<Checkbox checked={selectedCharts.yearlySales} onChange={(e) => setSelectedCharts({...selectedCharts, yearlySales: e.target.checked})} />}
+                                                    control={
+                                                        <Checkbox 
+                                                            checked={selectedCharts.yearlySales} 
+                                                            onChange={(e) => setSelectedCharts({ ...selectedCharts, yearlySales: e.target.checked })} 
+                                                            sx={{ color: '#dc0000', '&.Mui-checked': { color: '#dc0000' } }}
+                                                        />
+                                                    }
                                                     label="Yearly Sales"
+                                                    sx={{ '& .MuiFormControlLabel-label': { color: '#15151e', fontWeight: 500 } }}
                                                 />
                                                 <FormControlLabel
-                                                    control={<Checkbox checked={selectedCharts.products} onChange={(e) => setSelectedCharts({...selectedCharts, products: e.target.checked})} />}
+                                                    control={
+                                                        <Checkbox 
+                                                            checked={selectedCharts.products} 
+                                                            onChange={(e) => setSelectedCharts({ ...selectedCharts, products: e.target.checked })} 
+                                                            sx={{ color: '#dc0000', '&.Mui-checked': { color: '#dc0000' } }}
+                                                        />
+                                                    }
                                                     label="Products Chart"
+                                                    sx={{ '& .MuiFormControlLabel-label': { color: '#15151e', fontWeight: 500 } }}
                                                 />
                                                 <FormControlLabel
-                                                    control={<Checkbox checked={selectedCharts.categories} onChange={(e) => setSelectedCharts({...selectedCharts, categories: e.target.checked})} />}
+                                                    control={
+                                                        <Checkbox 
+                                                            checked={selectedCharts.categories} 
+                                                            onChange={(e) => setSelectedCharts({ ...selectedCharts, categories: e.target.checked })} 
+                                                            sx={{ color: '#dc0000', '&.Mui-checked': { color: '#dc0000' } }}
+                                                        />
+                                                    }
                                                     label="Categories Chart"
+                                                    sx={{ '& .MuiFormControlLabel-label': { color: '#15151e', fontWeight: 500 } }}
                                                 />
                                                 <FormControlLabel
-                                                    control={<Checkbox checked={selectedCharts.orderStatus} onChange={(e) => setSelectedCharts({...selectedCharts, orderStatus: e.target.checked})} />}
+                                                    control={
+                                                        <Checkbox 
+                                                            checked={selectedCharts.orderStatus} 
+                                                            onChange={(e) => setSelectedCharts({ ...selectedCharts, orderStatus: e.target.checked })} 
+                                                            sx={{ color: '#dc0000', '&.Mui-checked': { color: '#dc0000' } }}
+                                                        />
+                                                    }
                                                     label="Order Status Chart"
+                                                    sx={{ '& .MuiFormControlLabel-label': { color: '#15151e', fontWeight: 500 } }}
                                                 />
                                             </Box>
                                         </Grid>
@@ -384,8 +467,20 @@ const Dashboard = () => {
                                 <div className="row">
                                     {/* Monthly Sales Chart */}
                                     <div className="col-12 mb-4">
-                                        <Paper ref={salesChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
-                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                        <Paper ref={salesChartRef} sx={{ 
+                                            p: 3, 
+                                            background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)',
+                                            border: '3px solid #dc0000',
+                                            borderRadius: '10px',
+                                            boxShadow: '0 8px 20px rgba(220, 0, 0, 0.3)'
+                                        }}>
+                                            <Typography variant="h6" gutterBottom sx={{ 
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                fontSize: '24px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '2px'
+                                            }}>
                                                 Monthly Sales
                                             </Typography>
                                             <ResponsiveContainer width="100%" height={300}>
@@ -393,15 +488,15 @@ const Dashboard = () => {
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                                                     <XAxis dataKey="month" stroke="#fff" />
                                                     <YAxis stroke="#fff" />
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
                                                         labelStyle={{ color: '#fff' }}
                                                     />
                                                     <Legend wrapperStyle={{ color: '#fff' }} />
-                                                    <Line 
-                                                        type="monotone" 
-                                                        dataKey="sales" 
-                                                        stroke="#e10600" 
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="sales"
+                                                        stroke="#e10600"
                                                         strokeWidth={2}
                                                         fill="#e10600"
                                                         name="Sales (₱)"
@@ -413,8 +508,20 @@ const Dashboard = () => {
 
                                     {/* Yearly Sales Chart */}
                                     <div className="col-12 mb-4">
-                                        <Paper ref={yearlySalesChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
-                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                        <Paper ref={yearlySalesChartRef} sx={{ 
+                                            p: 3, 
+                                            background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)',
+                                            border: '3px solid #dc0000',
+                                            borderRadius: '10px',
+                                            boxShadow: '0 8px 20px rgba(220, 0, 0, 0.3)'
+                                        }}>
+                                            <Typography variant="h6" gutterBottom sx={{ 
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                fontSize: '24px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '2px'
+                                            }}>
                                                 Yearly Sales
                                             </Typography>
                                             <ResponsiveContainer width="100%" height={300}>
@@ -422,14 +529,14 @@ const Dashboard = () => {
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                                                     <XAxis dataKey="year" stroke="#fff" />
                                                     <YAxis stroke="#fff" />
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
                                                         labelStyle={{ color: '#fff' }}
                                                     />
                                                     <Legend wrapperStyle={{ color: '#fff' }} />
-                                                    <Bar 
-                                                        dataKey="sales" 
-                                                        fill="#e10600" 
+                                                    <Bar
+                                                        dataKey="sales"
+                                                        fill="#e10600"
                                                         name="Sales (₱)"
                                                     />
                                                 </BarChart>
@@ -439,22 +546,34 @@ const Dashboard = () => {
 
                                     {/* Most Ordered Products Chart */}
                                     <div className="col-md-6 mb-4">
-                                        <Paper ref={productsChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
-                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                        <Paper ref={productsChartRef} sx={{ 
+                                            p: 3, 
+                                            background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)',
+                                            border: '3px solid #dc0000',
+                                            borderRadius: '10px',
+                                            boxShadow: '0 8px 20px rgba(220, 0, 0, 0.3)'
+                                        }}>
+                                            <Typography variant="h6" gutterBottom sx={{ 
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                fontSize: '24px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '2px'
+                                            }}>
                                                 Most Ordered Products (Top 10)
                                             </Typography>
                                             <ResponsiveContainer width="100%" height={300}>
                                                 <BarChart data={getMostOrderedProductsData()}>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                                                    <XAxis 
-                                                        dataKey="name" 
-                                                        stroke="#fff" 
+                                                    <XAxis
+                                                        dataKey="name"
+                                                        stroke="#fff"
                                                         angle={-45}
                                                         textAnchor="end"
                                                         height={100}
                                                     />
                                                     <YAxis stroke="#fff" />
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
                                                         labelStyle={{ color: '#fff' }}
                                                     />
@@ -467,8 +586,20 @@ const Dashboard = () => {
 
                                     {/* Product Categories Chart */}
                                     <div className="col-md-6 mb-4">
-                                        <Paper ref={categoriesChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
-                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                        <Paper ref={categoriesChartRef} sx={{ 
+                                            p: 3, 
+                                            background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)',
+                                            border: '3px solid #dc0000',
+                                            borderRadius: '10px',
+                                            boxShadow: '0 8px 20px rgba(220, 0, 0, 0.3)'
+                                        }}>
+                                            <Typography variant="h6" gutterBottom sx={{ 
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                fontSize: '24px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '2px'
+                                            }}>
                                                 Product Categories Distribution
                                             </Typography>
                                             <ResponsiveContainer width="100%" height={300}>
@@ -487,7 +618,7 @@ const Dashboard = () => {
                                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                         ))}
                                                     </Pie>
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
                                                     />
                                                     <Legend wrapperStyle={{ color: '#fff' }} />
@@ -498,8 +629,20 @@ const Dashboard = () => {
 
                                     {/* Order Status Chart */}
                                     <div className="col-md-6 mb-4">
-                                        <Paper ref={orderStatusChartRef} sx={{ p: 3, background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)' }}>
-                                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                        <Paper ref={orderStatusChartRef} sx={{ 
+                                            p: 3, 
+                                            background: 'linear-gradient(145deg, #2c2c2c 0%, #1a1a1a 100%)',
+                                            border: '3px solid #dc0000',
+                                            borderRadius: '10px',
+                                            boxShadow: '0 8px 20px rgba(220, 0, 0, 0.3)'
+                                        }}>
+                                            <Typography variant="h6" gutterBottom sx={{ 
+                                                color: '#fff',
+                                                fontWeight: 700,
+                                                fontSize: '24px',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '2px'
+                                            }}>
                                                 Order Status Distribution
                                             </Typography>
                                             <ResponsiveContainer width="100%" height={300}>
@@ -518,7 +661,7 @@ const Dashboard = () => {
                                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                         ))}
                                                     </Pie>
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         contentStyle={{ backgroundColor: '#333', border: '1px solid #e10600' }}
                                                     />
                                                     <Legend wrapperStyle={{ color: '#fff' }} />
@@ -533,7 +676,7 @@ const Dashboard = () => {
                 </div>
             </div>
         </>
-    )
-}
+    );
+};
 
-export default Dashboard
+export default Dashboard;

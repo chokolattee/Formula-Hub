@@ -19,7 +19,7 @@ exports.newOrder = async (req, res, next) => {
 
         for (const item of orderItems) {
             const product = await Product.findById(item.product);
-            
+
             if (!product) {
                 return res.status(404).json({
                     success: false,
@@ -64,7 +64,7 @@ exports.newOrder = async (req, res, next) => {
             }
 
             const emailHTML = getOrderStatusEmailTemplate(order, null);
-            
+
             await sendEmail({
                 email: order.user.email,
                 subject: `Order Confirmation - Order #${order._id}`,
@@ -113,7 +113,7 @@ exports.newOrder = async (req, res, next) => {
 exports.myOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ user: req.user.id });
-        
+
         res.status(200).json({
             success: true,
             orders
@@ -130,14 +130,14 @@ exports.getSingleOrder = async (req, res, next) => {
     try {
         const order = await Order.findById(req.params.id)
             .populate('user', 'name email first_name last_name');
-        
+
         if (!order) {
             return res.status(404).json({
                 success: false,
                 message: 'No Order found with this ID'
             });
         }
-        
+
         res.status(200).json({
             success: true,
             order
@@ -155,7 +155,7 @@ exports.allOrders = async (req, res, next) => {
         const orders = await Order.find()
             .populate('user', 'name email first_name last_name')
             .sort({ createdAt: -1 });
-        
+
         let totalAmount = 0;
         orders.forEach(order => {
             totalAmount += order.totalPrice;
@@ -243,11 +243,11 @@ exports.updateOrder = async (req, res, next) => {
         }
 
         order.orderStatus = newStatus;
-        order.updatedAt = Date.now(); 
+        order.updatedAt = Date.now();
 
         await order.save();
 
-        // Send status update email w
+        // Send status update email
         let pdfPath = null;
         try {
             pdfPath = await generatePDFReceipt(order);
@@ -258,7 +258,7 @@ exports.updateOrder = async (req, res, next) => {
             }
 
             const emailHTML = getOrderStatusEmailTemplate(order, previousStatus);
-            
+
             // Send email with attachment
             await sendEmail({
                 email: order.user.email,
@@ -331,7 +331,7 @@ exports.cancelOrder = async (req, res, next) => {
         }
 
         order.orderStatus = "Cancelled";
-        order.updatedAt = Date.now(); 
+        order.updatedAt = Date.now();
         await order.save();
 
         let pdfPath = null;
@@ -405,125 +405,315 @@ async function generatePDFReceipt(order) {
 
             doc.pipe(stream);
 
+            // F1 Theme Colors
+            const F1_RED = '#DC0000';
+            const F1_DARK_RED = '#A00000';
+            const F1_BLACK = '#15151E';
+            const F1_DARK_GRAY = '#2A2A2A';
+            const F1_LIGHT_GRAY = '#E5E5E5';
+            const F1_WHITE = '#FFFFFF';
+            const F1_ACCENT = '#FFD700';
+
             // Get customer name
             let customerName = 'Valued Customer';
             if (order.user.first_name) {
-                customerName = order.user.last_name 
+                customerName = order.user.last_name
                     ? `${order.user.first_name} ${order.user.last_name}`.trim()
                     : order.user.first_name;
             } else if (order.user.name) {
                 customerName = order.user.name;
             }
 
-            // Header
-            doc.fontSize(24).fillColor('#d32f2f').text('FormulaHub', { align: 'center' });
-            doc.moveDown(0.5);
-            doc.fontSize(18).fillColor('#000').text('Order Receipt', { align: 'center' });
-            doc.moveDown(0.5);
-            doc.fontSize(10).fillColor('#666').text(`Order #${order._id.toString().slice(-8).toUpperCase()}`, { align: 'center' });
-            doc.moveDown(2);
+            // Header with F1 Racing Style
+            // Red racing stripe at top
+            doc.rect(0, 0, 612, 15).fill(F1_RED);
+            doc.rect(0, 15, 612, 5).fill(F1_ACCENT);
 
-            // Order Status Badge
-            const statusColors = {
-                'Processing': '#ff9800',
-                'Shipped': '#2196f3',
-                'Delivered': '#4caf50',
-                'Cancelled': '#f44336'
-            };
-            const statusColor = statusColors[order.orderStatus] || '#757575';
-            
-            doc.fontSize(12).fillColor(statusColor).text(`Status: ${order.orderStatus}`, { align: 'center' });
-            doc.moveDown(2);
+            doc.moveDown(1);
 
-            // Order Information
-            doc.fontSize(14).fillColor('#000').text('Order Information', { underline: true });
+            // Company Name - Bold F1 Style
+            doc.fontSize(32)
+                .fillColor(F1_RED)
+                .font('Helvetica-Bold')
+                .text('FORMULAHUB', { align: 'center' });
+
+            doc.moveDown(0.3);
+
+            // Subtitle with accent
+            doc.fontSize(10)
+                .fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text('PERFORMANCE • PRECISION • EXCELLENCE', { align: 'center' });
+
             doc.moveDown(0.5);
-            doc.fontSize(10).fillColor('#333');
-            doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
-            doc.text(`Payment Status: ${order.paymentInfo?.status === 'succeeded' ? 'PAID' : 'NOT PAID'}`);
-            doc.text('Updated At: ' + (order.updateAt ? new Date(order.updateAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'));
+
+            // Order Receipt Title
+            doc.fontSize(22)
+                .fillColor(F1_BLACK)
+                .font('Helvetica-Bold')
+                .text('ORDER RECEIPT', { align: 'center' });
+
+            doc.moveDown(0.3);
+
+            // Order ID with racing number style
+            doc.fontSize(12)
+                .fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text(`ORDER #${order._id.toString().slice(-8).toUpperCase()}`, { align: 'center' });
+
             doc.moveDown(1.5);
 
-            // Shipping Information
-            doc.fontSize(14).fillColor('#000').text('Shipping Address', { underline: true });
-            doc.moveDown(0.5);
-            doc.fontSize(10).fillColor('#333');
-            doc.text(customerName);
-            doc.text(order.shippingInfo.address);
-            doc.text(`${order.shippingInfo.city}, ${order.shippingInfo.postalCode}`);
-            doc.text(order.shippingInfo.country);
-            doc.text(`Phone: ${order.shippingInfo.phoneNo}`);
-            doc.moveDown(2);
+            // Racing-style divider line
+            doc.moveTo(50, doc.y)
+                .lineTo(562, doc.y)
+                .lineWidth(3)
+                .strokeColor(F1_RED)
+                .stroke();
 
-            // Order Items Table
-            doc.fontSize(14).fillColor('#000').text('Order Items', { underline: true });
             doc.moveDown(0.5);
 
-            // Table Header
+            // Order Status Badge - Racing Flag Style
+            const statusColors = {
+                'Processing': F1_ACCENT,
+                'Shipped': '#2196f3',
+                'Delivered': '#4caf50',
+                'Cancelled': F1_DARK_RED
+            };
+            const statusColor = statusColors[order.orderStatus] || F1_DARK_GRAY;
+
+            // Status box background
+            const statusY = doc.y;
+            doc.roundedRect(200, statusY, 212, 35, 5)
+                .fill(statusColor);
+
+            // Status text
+            doc.fontSize(16)
+                .fillColor(F1_WHITE)
+                .font('Helvetica-Bold')
+                .text(`STATUS: ${order.orderStatus.toUpperCase()}`, 200, statusY + 10, {
+                    width: 212,
+                    align: 'center'
+                });
+
+            doc.moveDown(3);
+
+            // Order Information Section
+            doc.fontSize(16)
+                .fillColor(F1_RED)
+                .font('Helvetica-Bold')
+                .text('ORDER INFORMATION', { underline: true });
+
+            doc.moveDown(0.5);
+
+            doc.fontSize(10)
+                .fillColor(F1_BLACK)
+                .font('Helvetica');
+
+            doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            })}`);
+
+            // Payment status with colored indicator
+            const paymentPaid = order.paymentInfo?.status === 'succeeded';
+            doc.text('Payment Status: ', { continued: true })
+                .fillColor(paymentPaid ? '#4caf50' : F1_DARK_RED)
+                .font('Helvetica-Bold')
+                .text(paymentPaid ? 'PAID ✓' : 'NOT PAID')
+                .fillColor(F1_BLACK)
+                .font('Helvetica');
+
+            doc.text('Updated At: ' + (order.updatedAt ?
+                new Date(order.updatedAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }) : 'N/A'));
+
+            doc.moveDown(1.5);
+
+            // Shipping Information with racing border
+            doc.fontSize(16)
+                .fillColor(F1_RED)
+                .font('Helvetica-Bold')
+                .text('SHIPPING ADDRESS', { underline: true });
+
+            doc.moveDown(0.5);
+
+            // Address box with F1 styling
+            const addressY = doc.y;
+            doc.roundedRect(50, addressY, 512, 100, 5)
+                .lineWidth(2)
+                .strokeColor(F1_LIGHT_GRAY)
+                .stroke();
+
+            // Red accent stripe on left
+            doc.rect(50, addressY, 5, 100)
+                .fill(F1_RED);
+
+            doc.fontSize(11)
+                .fillColor(F1_BLACK)
+                .font('Helvetica-Bold')
+                .text(customerName, 65, addressY + 15);
+
+            doc.fontSize(10)
+                .fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text(order.shippingInfo.address, 65, addressY + 32)
+                .text(`${order.shippingInfo.city}, ${order.shippingInfo.postalCode}`, 65, addressY + 47)
+                .text(order.shippingInfo.country, 65, addressY + 62)
+                .fillColor(F1_RED)
+                .text(`Phone: ${order.shippingInfo.phoneNo}`, 65, addressY + 77);
+
+            doc.moveDown(7);
+
+            // Order Items Table with Racing Grid Style
+            doc.fontSize(16)
+                .fillColor(F1_RED)
+                .font('Helvetica-Bold')
+                .text('ORDER ITEMS', { underline: true });
+
+            doc.moveDown(0.5);
+
+            // Table Header with F1 Red background
             const tableTop = doc.y;
-            doc.fontSize(10).fillColor('#666');
-            doc.text('Product', 50, tableTop, { width: 250 });
-            doc.text('Qty', 300, tableTop, { width: 50, align: 'center' });
-            doc.text('Price', 350, tableTop, { width: 90, align: 'right' });
-            doc.text('Subtotal', 440, tableTop, { width: 100, align: 'right' });
+            doc.rect(50, tableTop, 512, 25)
+                .fill(F1_BLACK);
 
-            // Draw line under header
-            doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke('#ddd');
+            doc.fontSize(10)
+                .fillColor(F1_WHITE)
+                .font('Helvetica-Bold');
 
-            let yPosition = tableTop + 25;
+            doc.text('PRODUCT', 60, tableTop + 8, { width: 250 });
+            doc.text('QTY', 310, tableTop + 8, { width: 40, align: 'center' });
+            doc.text('PRICE', 360, tableTop + 8, { width: 80, align: 'right' });
+            doc.text('SUBTOTAL', 450, tableTop + 8, { width: 100, align: 'right' });
 
-            // Table Items
-            doc.fontSize(9).fillColor('#333');
+            let yPosition = tableTop + 35;
+
+            // Table Items with alternating background
+            doc.fontSize(9).font('Helvetica');
             order.orderItems.forEach((item, index) => {
-                doc.text(item.name, 50, yPosition, { width: 250 });
-                doc.text(item.quantity.toString(), 300, yPosition, { width: 50, align: 'center' });
-                doc.text(`PHP ${item.price.toFixed(2)}`, 350, yPosition, { width: 90, align: 'right' });
-                doc.text(`PHP ${(item.price * item.quantity).toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
-                
+                // Alternating row background
+                if (index % 2 === 0) {
+                    doc.rect(50, yPosition - 5, 512, 25)
+                        .fill(F1_LIGHT_GRAY);
+                }
+
+                doc.fillColor(F1_BLACK)
+                    .text(item.name, 60, yPosition, { width: 240 });
+
+                doc.fillColor(F1_DARK_GRAY)
+                    .text(item.quantity.toString(), 310, yPosition, { width: 40, align: 'center' });
+
+                doc.text(`PHP ${item.price.toFixed(2)}`, 360, yPosition, { width: 80, align: 'right' });
+
+                doc.fillColor(F1_BLACK)
+                    .font('Helvetica-Bold')
+                    .text(`PHP ${(item.price * item.quantity).toFixed(2)}`, 450, yPosition, { width: 100, align: 'right' })
+                    .font('Helvetica');
+
                 yPosition += 25;
-                
-                // Add new page if needed
-                if (yPosition > 700) {
+
+                // Add new page if needed - with more conservative threshold
+                if (yPosition > 650) { // Changed from 700 to 650 to give more space
                     doc.addPage();
                     yPosition = 50;
+                    
+                    // Add header for new page
+                    doc.fontSize(10)
+                        .fillColor(F1_DARK_GRAY)
+                        .font('Helvetica')
+                        .text(`Order #${order._id.toString().slice(-8).toUpperCase()} - Continued`, 50, 30);
                 }
             });
 
-            // Draw line before totals
-            doc.moveTo(50, yPosition).lineTo(540, yPosition).stroke('#ddd');
-            yPosition += 15;
+            // Racing stripe divider
+            doc.moveTo(50, yPosition)
+                .lineTo(562, yPosition)
+                .lineWidth(2)
+                .strokeColor(F1_RED)
+                .stroke();
 
-            // Totals
-            doc.fontSize(10).fillColor('#333');
-            doc.text('Items Subtotal:', 350, yPosition, { width: 90, align: 'right' });
-            doc.text(`PHP ${order.itemsPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
             yPosition += 20;
 
-            doc.text('Tax:', 350, yPosition, { width: 90, align: 'right' });
-            doc.text(`PHP ${order.taxPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            // Check if we need a new page for the totals section
+            if (yPosition > 600) { // If we're too close to the bottom, start new page
+                doc.addPage();
+                yPosition = 50;
+                
+                // Add header for new page
+                doc.fontSize(10)
+                    .fillColor(F1_DARK_GRAY)
+                    .font('Helvetica')
+                    .text(`Order #${order._id.toString().slice(-8).toUpperCase()} - Totals`, 50, 30);
+            }
+
+            // Totals Section with F1 Styling
+            doc.fontSize(10)
+                .fillColor(F1_DARK_GRAY)
+                .font('Helvetica');
+
+            doc.text('Items Subtotal:', 360, yPosition, { width: 80, align: 'right' });
+            doc.fillColor(F1_BLACK)
+                .font('Helvetica-Bold')
+                .text(`PHP ${order.itemsPrice.toFixed(2)}`, 450, yPosition, { width: 100, align: 'right' });
             yPosition += 20;
 
-            doc.text('Shipping:', 350, yPosition, { width: 90, align: 'right' });
-            doc.text(`PHP ${order.shippingPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            doc.fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text('Tax:', 360, yPosition, { width: 80, align: 'right' });
+            doc.fillColor(F1_BLACK)
+                .font('Helvetica-Bold')
+                .text(`PHP ${order.taxPrice.toFixed(2)}`, 450, yPosition, { width: 100, align: 'right' });
             yPosition += 20;
 
-            // Draw line before grand total
-            doc.moveTo(350, yPosition).lineTo(540, yPosition).stroke('#d32f2f');
-            yPosition += 15;
+            doc.fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text('Shipping:', 360, yPosition, { width: 80, align: 'right' });
+            doc.fillColor(F1_BLACK)
+                .font('Helvetica-Bold')
+                .text(`PHP ${order.shippingPrice.toFixed(2)}`, 450, yPosition, { width: 100, align: 'right' });
+            yPosition += 20;
 
-            // Grand Total
-            doc.fontSize(12).fillColor('#000').font('Helvetica-Bold');
-            doc.text('Grand Total:', 350, yPosition, { width: 90, align: 'right' });
-            doc.fillColor('#d32f2f').text(`₱${order.totalPrice.toFixed(2)}`, 440, yPosition, { width: 100, align: 'right' });
+            // Grand total racing box - ensure we have enough space
+            if (yPosition > 700) { // If not enough space for grand total, start new page
+                doc.addPage();
+                yPosition = 50;
+            }
 
-            // Footer
-            doc.fontSize(8).fillColor('#999').font('Helvetica');
-            doc.text(
-                `© ${new Date().getFullYear()} FormulaHub. All rights reserved.\nQuestions? Contact us at formulahub@support.com`,
-                50,
-                750,
-                { align: 'center', width: 500 }
-            );
+            // Grand total racing box
+            doc.roundedRect(350, yPosition, 200, 40, 5)
+                .fill(F1_RED);
+
+            doc.fontSize(12)
+                .fillColor(F1_WHITE)
+                .font('Helvetica-Bold')
+                .text('GRAND TOTAL:', 360, yPosition + 8, { width: 80, align: 'right' });
+
+            doc.fontSize(16)
+                .fillColor(F1_ACCENT)
+                .text(`Php ${order.totalPrice.toFixed(2)}`, 450, yPosition + 8, { width: 90, align: 'right' });
+
+            yPosition += 60; // Space after grand total
+
+            // Footer with racing stripes - ensure footer is on same page
+            const footerY = Math.max(yPosition, 700); // Ensure footer is at bottom
+            
+            // Racing stripes at bottom
+            doc.rect(0, footerY, 612, 5).fill(F1_ACCENT);
+            doc.rect(0, footerY + 5, 612, 15).fill(F1_RED);
+
+            doc.fontSize(8)
+                .fillColor(F1_DARK_GRAY)
+                .font('Helvetica')
+                .text(
+                    `© ${new Date().getFullYear()} FormulaHub. All rights reserved. | Questions? Contact: formulahub@support.com`,
+                    50,
+                    footerY - 20,
+                    { align: 'center', width: 512 }
+                );
 
             doc.end();
 
@@ -563,9 +753,9 @@ const getOrderStatusEmailTemplate = (order, previousStatus) => {
     const statusIcon = statusIcons[order.orderStatus] || '📋';
 
     let customerName = 'Valued Customer';
-    
+
     if (order.user.first_name) {
-        customerName = order.user.last_name 
+        customerName = order.user.last_name
             ? `${order.user.first_name} ${order.user.last_name}`.trim()
             : order.user.first_name;
     } else if (order.user.name) {
@@ -597,36 +787,6 @@ const getOrderStatusEmailTemplate = (order, previousStatus) => {
         statusMessage = `
             <div style="background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 30px 0;">
                 <div style="font-size: 48px; margin-bottom: 15px;">🎉</div>
-                <h2 style="margin: 0 0 10px 0; color: #ffffff; font-size: 24px;">Your Order Has Been Delivered!</h2>
-                <p style="margin: 0; color: #ffffff; font-size: 16px; opacity: 0.95;">
-                    Thank you for shopping with us. We hope you enjoy your purchase!
-                </p>
-            </div>
-        `;
-    } else if (order.orderStatus === 'Shipped') {
-        statusMessage = `
-            <div style="background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 30px 0;">
-                <div style="font-size: 48px; margin-bottom: 15px;">📦</div>
-                <h2 style="margin: 0 0 10px 0; color: #ffffff; font-size: 24px;">Your Order Is On Its Way!</h2>
-                <p style="margin: 0; color: #ffffff; font-size: 16px; opacity: 0.95;">
-                    Your package is being delivered. You'll receive it soon!
-                </p>
-            </div>
-        `;
-    } else if (order.orderStatus === 'Cancelled') {
-        statusMessage = `
-            <div style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 30px 0;">
-                <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
-                <h2 style="margin: 0 0 10px 0; color: #ffffff; font-size: 24px;">Your Order Has Been Cancelled</h2>
-                <p style="margin: 0; color: #ffffff; font-size: 16px; opacity: 0.95;">
-                    Your order has been cancelled. If you have any questions, please contact our support team.
-                </p>
-            </div>
-        `;
-    } else {
-        statusMessage = `
-            <div style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); padding: 25px; border-radius: 12px; text-align: center; margin: 30px 0;">
-                <div style="font-size: 48px; margin-bottom: 15px;">⏳</div>
                 <h2 style="margin: 0 0 10px 0; color: #ffffff; font-size: 24px;">Your Order Is Being Processed</h2>
                 <p style="margin: 0; color: #ffffff; font-size: 16px; opacity: 0.95;">
                     We're preparing your order. You'll be notified when it ships!
@@ -691,11 +851,11 @@ const getOrderStatusEmailTemplate = (order, previousStatus) => {
                         <tr>
                             <td style="color: #666; font-size: 14px; padding: 8px 0;">Order Date:</td>
                             <td style="text-align: right; color: #333; font-weight: 600; padding: 8px 0;">
-                                ${new Date(order.createdAt).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                })}
+                                ${new Date(order.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })}
                             </td>
                         </tr>
                         <tr>

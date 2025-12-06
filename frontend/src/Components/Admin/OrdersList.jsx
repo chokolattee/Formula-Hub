@@ -184,35 +184,112 @@ const OrdersList = () => {
     }
 
     const exportToPDF = () => {
-        const doc = new jsPDF()
-        
-        doc.setFontSize(18)
-        doc.text('Orders Report', 14, 22)
-        
-        doc.setFontSize(11)
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30)
-        doc.text(`Total Orders: ${filteredOrders.length}`, 14, 36)
-        
-        const tableData = filteredOrders.map(order => [
-            order._id.substring(0, 8) + '...',
-            getCustomerName(order.user),
-            order.orderItems.length,
-            `₱${order.totalPrice}`,
-            order.orderStatus,
-            new Date(order.createdAt).toLocaleDateString()
-        ])
-        
-        autoTable(doc, {
-            head: [['Order ID', 'Customer', 'Items', 'Amount', 'Status', 'Date']],
-            body: tableData,
-            startY: 42,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [25, 118, 210] }
-        })
-        
-        doc.save(`orders_${new Date().toISOString().split('T')[0]}.pdf`)
-        successMsg('Orders exported to PDF')
+    const doc = new jsPDF();
+
+    // Header with F1 theme
+    doc.setFillColor(220, 0, 0); // F1 Red
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255); // White text
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDERS REPORT', 105, 18, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 26, { align: 'center' });
+    doc.text(`Total Orders: ${filteredOrders.length}`, 105, 32, { align: 'center' });
+
+    // Summary section
+    doc.setTextColor(0, 0, 0); // Black text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDER SUMMARY', 14, 50);
+
+    const totalAmount = filteredOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+    const processingCount = filteredOrders.filter(o => o.orderStatus === 'Processing').length;
+    const shippedCount = filteredOrders.filter(o => o.orderStatus === 'Shipped').length;
+    const deliveredCount = filteredOrders.filter(o => o.orderStatus === 'Delivered').length;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Total Revenue: Php ${totalAmount.toFixed(2)}`, 14, 58);
+    doc.text(`Processing: ${processingCount} | Shipped: ${shippedCount} | Delivered: ${deliveredCount}`, 14, 64);
+
+    // Table data
+    const tableData = filteredOrders.map(order => [
+        order._id.substring(0, 10) + '...',
+        getCustomerName(order.user),
+        order.orderItems.length.toString(),
+        `Php ${order.totalPrice.toFixed(2)}`,
+        order.orderStatus,
+        new Date(order.createdAt).toLocaleDateString()
+    ]);
+
+    autoTable(doc, {
+        head: [['Order ID', 'Customer', 'Items', 'Amount', 'Status', 'Date']],
+        body: tableData,
+        startY: 72,
+        theme: 'grid',
+        styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            lineColor: [220, 0, 0],
+            lineWidth: 0.5
+        },
+        headStyles: {
+            fillColor: [220, 0, 0], // F1 Red
+            textColor: [255, 255, 255], // White
+            fontStyle: 'bold',
+            fontSize: 10,
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245] // Light gray
+        },
+        columnStyles: {
+            0: { cellWidth: 35, fontStyle: 'bold' },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 20, halign: 'center' },
+            3: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
+            4: { cellWidth: 30, halign: 'center' },
+            5: { cellWidth: 30, halign: 'center' }
+        },
+        didParseCell: function (data) {
+            // Color code status cells
+            if (data.column.index === 4 && data.section === 'body') {
+                const status = data.cell.raw;
+                if (status === 'Processing') {
+                    data.cell.styles.textColor = [255, 152, 0]; // Orange
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (status === 'Shipped') {
+                    data.cell.styles.textColor = [33, 150, 243]; // Blue
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (status === 'Delivered') {
+                    data.cell.styles.textColor = [76, 175, 80]; // Green
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+            `Page ${i} of ${pageCount} | FormulaHub Orders Report`,
+            105,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+        );
     }
+
+    doc.save(`formulahub_orders_${new Date().toISOString().split('T')[0]}.pdf`);
+    successMsg('Orders exported to PDF');
+};
 
     // PrimeReact Templates
     const rowExpansionTemplate = (data) => {
@@ -396,6 +473,7 @@ const OrdersList = () => {
                                             <MenuItem value="Processing">Processing</MenuItem>
                                             <MenuItem value="Shipped">Shipped</MenuItem>
                                             <MenuItem value="Delivered">Delivered</MenuItem>
+                                            <MenuItem value="Cancelled">Cancelled</MenuItem>
                                         </Select>
                                     </FormControl>
 

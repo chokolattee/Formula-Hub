@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import axios from 'axios'
 import MetaData from './Layout/MetaData'
 import Loader from './Layout/Loader'
@@ -22,13 +22,13 @@ const Home = () => {
     const lastProductRef = useCallback(node => {
         if (loadingMore) return
         if (observer.current) observer.current.disconnect()
-        
+
         observer.current = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting && hasMore && !isSearchMode) {
                 setCurrentPage(prevPage => prevPage + 1)
             }
         })
-        
+
         if (node) observer.current.observe(node)
     }, [loadingMore, hasMore, isSearchMode])
 
@@ -44,20 +44,20 @@ const Home = () => {
 
             let res = await axios.get(link)
             console.log('API Response:', res.data)
-            
+
             const newProducts = res.data.data || []
             const total = res.data.pagination?.total || 0
             const limit = res.data.pagination?.limit || 9
-            
+
             if (page === 1 || isNewSearch) {
                 setProducts(newProducts)
             } else {
                 setProducts(prevProducts => [...prevProducts, ...newProducts])
             }
-            
+
             const totalPages = Math.ceil(total / limit)
             setHasMore(page < totalPages)
-            
+
             setLoading(false)
             setLoadingMore(false)
         } catch (error) {
@@ -71,12 +71,12 @@ const Home = () => {
         try {
             setLoading(true)
             setIsSearchMode(true)
-            
+
             const { data } = await axios.get(`http://localhost:8000/api/v1/search/${keyword}`)
             console.log('Search Results:', data)
-            
+
             setProducts(data)
-            setHasMore(false) 
+            setHasMore(false)
             setLoading(false)
         } catch (error) {
             console.error('Error searching products:', error)
@@ -88,11 +88,11 @@ const Home = () => {
     // Initial load or search
     useEffect(() => {
         setLoading(true)
-        setTimeout(() => {
+        const timer = setTimeout(() => {
             setProducts([])
             setCurrentPage(1)
             setHasMore(true)
-            
+
             if (keyword) {
                 // Search mode
                 searchProducts(keyword)
@@ -102,6 +102,8 @@ const Home = () => {
                 getProducts('', 1, true)
             }
         }, 500);
+
+        return () => clearTimeout(timer)
     }, [keyword]);
 
     // Load more products when page changes 
@@ -110,7 +112,7 @@ const Home = () => {
             getProducts('', currentPage, false)
         }
     }, [currentPage, isSearchMode]);
-    
+
     return (
         <>
             <MetaData title={keyword ? `Search: ${keyword} | FormulaHub` : 'FormulaHub | F1 Collectibles Store'} />
@@ -126,7 +128,7 @@ const Home = () => {
                                     <FaTwitterSquare />
                                 </div>
                                 <h1 className="hero-main-title">
-                                    {keyword ? `SEARCH RESULTS` : 'FORMULA HUB'}
+                                    {keyword ? 'SEARCH RESULTS' : 'FORMULA HUB'}
                                 </h1>
                                 <p className="hero-subtitle">
                                     {keyword ? `Showing results for "${keyword}"` : 'Premium F1 Collectibles & Racing Memorabilia'}
@@ -136,23 +138,35 @@ const Home = () => {
                                         <div className="hero-features-list">
                                             <div className="hero-feature-badge">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#DC0000"/>
+                                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#DC0000" />
                                                 </svg>
                                                 <span>Authentic Items</span>
                                             </div>
                                             <div className="hero-feature-badge">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M14.4 6L14 4H5V21H7V14H12.6L13 16H20V6H14.4Z" fill="#DC0000"/>
+                                                    <path d="M14.4 6L14 4H5V21H7V14H12.6L13 16H20V6H14.4Z" fill="#DC0000" />
                                                 </svg>
                                                 <span>Limited Editions</span>
                                             </div>
                                         </div>
-                                        <button className="hero-cta-button">RACE TO SHOP</button>
+                                        <Link to="/Store">
+                                            <button className="hero-cta-button">RACE TO SHOP</button>
+                                        </Link>
                                     </>
                                 )}
                             </div>
-                            <div className="hero-red-square"></div>
-                            <div className="hero-black-square"></div>
+                            <div className="hero-red-square">
+                                <span className="limited-edition-text">LIMITED EDITION</span>
+                            </div>
+                            <div className="hero-black-square">
+                                <Link to="/product/6918a322c80fbba9c6838525">
+                                    <img
+                                        src="/images/limited.png"
+                                        alt="Limited Edition F1 Figurine"
+                                        className="hero-figurine"
+                                    />
+                                </Link>
+                            </div>
                         </div>
                     </section>
                     <section className='light-section f1-section'>
@@ -169,7 +183,7 @@ const Home = () => {
                         <div className="store-primary f1-store">
                             {products && products.length > 0 ? (
                                 products.map((product, index) => (
-                                    <Product 
+                                    <Product
                                         key={product._id}
                                         product={product}
                                         lastProductRef={!isSearchMode && products.length === index + 1 ? lastProductRef : null}

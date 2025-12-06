@@ -11,6 +11,8 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import Home from './Components/Home';
 import Store from "./Components/Store";
+import AboutUs from "./Components/AboutUs";
+import Support from "./Components/Support";
 import ProductDetails from './Components/Product/ProductDetails';
 import Login from './Components/User/Login';
 import ForgotPassword from './Components/User/ForgotPassword';
@@ -168,25 +170,27 @@ function App() {
         <Header cartItems={state.cartItems} />
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<HomeRoute />} exact="true" />
-          <Route path="/store" element={<Store />} exact="true" />
-          <Route path="/product/:id" element={<ProductDetails cartItems={state.cartItems} addItemToCart={addItemToCart} />} exact="true" />
-          <Route path="/search/:keyword" element={<Home />} exact="true" />
-          <Route path="/login" element={<Login />} exact="true" />
-          <Route path="/password/forgot" element={<ForgotPassword />} exact="true" />
-          <Route path="/password/reset/:token" element={<NewPassword />} exact="true" />
+          <Route path="/" element={<HomeRoute />} />
+          <Route path="/store" element={<Store />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/product/:id" element={<ProductDetails cartItems={state.cartItems} addItemToCart={addItemToCart} />} />
+          <Route path="/search/:keyword" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/password/forgot" element={<ForgotPassword />} />
+          <Route path="/password/reset/:token" element={<NewPassword />} />
           
           {/* Protected User Routes */}
           <Route path="/me" element={
             <ProtectedRoute>
               <Profile />
             </ProtectedRoute>
-          } exact="true" />
+          } />
           <Route path="/cart" element={
             <ProtectedRoute>
               <Cart cartItems={state.cartItems} addItemToCart={addItemToCart} removeItemFromCart={removeItemFromCart} />
             </ProtectedRoute>
-          } exact="true" />
+          } />
           <Route path="/shipping" element={
             <ProtectedRoute>
               <Shipping shipping={state.shippingInfo} saveShippingInfo={saveShippingInfo} />

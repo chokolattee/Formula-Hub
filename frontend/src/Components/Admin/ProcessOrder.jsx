@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
-import MetaData from '../Layout/MetaData'
-import Loader from '../Layout/Loader'
-import Sidebar from './Layout/SideBar'
-import { toast } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
-import axios from 'axios'
-import { getToken } from '../Utils/helpers'
+import React, { useState, useEffect } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import MetaData from '../Layout/MetaData';
+import Loader from '../Layout/Loader';
+import Sidebar from './Layout/SideBar';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import axios from 'axios';
+import { getToken } from '../Utils/helpers';
 
 import {
     Box,
@@ -30,7 +30,7 @@ import {
     TableHead,
     TableRow,
     Alert
-} from '@mui/material'
+} from '@mui/material';
 import {
     LocalShipping,
     Payment,
@@ -42,31 +42,31 @@ import {
     CheckCircle,
     Cancel,
     HourglassEmpty
-} from '@mui/icons-material'
+} from '@mui/icons-material';
 
-import '../../Styles/admin.css'
+import '../../Styles/admin.css';
 
 const ProcessOrder = () => {
-    const [status, setStatus] = useState('')
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
-    const [order, setOrder] = useState({})
-    const [isUpdated, setIsUpdated] = useState(false)
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [status, setStatus] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [order, setOrder] = useState({});
+    const [isUpdated, setIsUpdated] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
-    let navigate = useNavigate()
-    let { id } = useParams()
+    let navigate = useNavigate();
+    let { id } = useParams();
     
-    const { shippingInfo, orderItems, paymentInfo, user, totalPrice, orderStatus } = order
-    const orderId = id
+    const { shippingInfo, orderItems, paymentInfo, user, totalPrice, orderStatus } = order;
+    const orderId = id;
 
     const errMsg = (message = '') => toast.error(message, {
         position: 'bottom-center'
-    })
+    });
 
     const successMsg = (message = '') => toast.success(message, {
         position: 'bottom-center'
-    })
+    });
 
     // Helper function to get customer name
     const getCustomerName = (user) => {
@@ -78,6 +78,26 @@ const ProcessOrder = () => {
         return 'N/A';
     };
 
+    // Get allowed status options based on current order status
+    const getAllowedStatuses = (currentStatus) => {
+        switch (currentStatus) {
+            case 'Processing':
+                // Processing can go to Shipped or Cancelled
+                return ['Processing', 'Shipped', 'Cancelled'];
+            case 'Shipped':
+                // Shipped can only go to Delivered
+                return ['Shipped', 'Delivered'];
+            case 'Delivered':
+                // Delivered is final - no updates allowed
+                return [];
+            case 'Cancelled':
+                // Cancelled is final - no updates allowed
+                return [];
+            default:
+                return ['Processing', 'Shipped', 'Delivered', 'Cancelled'];
+        }
+    };
+
     const getOrderDetails = async (id) => {
         try {
             const config = {
@@ -85,16 +105,16 @@ const ProcessOrder = () => {
                     'Content-Type': 'multipart/form-data',
                     'Authorization': `Bearer ${getToken()}`
                 }
-            }
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/order/${id}`, config)
-            setOrder(data.order)
-            setStatus(data.order.orderStatus)
-            setLoading(false)
+            };
+            const { data } = await axios.get(`${import.meta.env.VITE_API}/order/${id}`, config);
+            setOrder(data.order);
+            setStatus(data.order.orderStatus);
+            setLoading(false);
         } catch (error) {
-            setError(error.response?.data?.message || 'Failed to load order')
-            setLoading(false)
+            setError(error.response?.data?.message || 'Failed to load order');
+            setLoading(false);
         }
-    }
+    };
 
     const updateOrder = async (id, formData) => {
         try {
@@ -103,80 +123,85 @@ const ProcessOrder = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${getToken()}`
                 }
-            }
-            const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/order/${id}`, formData, config)
-            setIsUpdated(data.success)
+            };
+            const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/order/${id}`, formData, config);
+            setIsUpdated(data.success);
         } catch (error) {
-            setError(error.response?.data?.message || 'Failed to update order')
+            setError(error.response?.data?.message || 'Failed to update order');
         }
-    }
+    };
 
     useEffect(() => {
-        getOrderDetails(orderId)
-    }, [orderId])
+        getOrderDetails(orderId);
+    }, [orderId]);
 
     useEffect(() => {
         if (error) {
-            errMsg(error)
-            setError('')
+            errMsg(error);
+            setError('');
         }
         if (isUpdated) {
-            successMsg('Order updated successfully')
-            setIsUpdated(false)
-            setTimeout(() => navigate('/admin/orders'), 1500)
+            successMsg('Order updated successfully');
+            setIsUpdated(false);
+            setTimeout(() => navigate('/admin/orders'), 1500);
         }
-    }, [error, isUpdated, navigate])
+    }, [error, isUpdated, navigate]);
 
     // Auto-open sidebar on desktop
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth > 992) {
-                setIsSidebarOpen(true)
+                setIsSidebarOpen(true);
             } else {
-                setIsSidebarOpen(false)
+                setIsSidebarOpen(false);
             }
-        }
-        handleResize()
-        window.addEventListener('resize', handleResize)
-        return () => window.removeEventListener('resize', handleResize)
-    }, [])
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const updateOrderHandler = (id) => {
         if (!status) {
-            errMsg('Please select a status')
-            return
+            errMsg('Please select a status');
+            return;
         }
-        const formData = { status }
-        updateOrder(id, formData)
-    }
+        if (status === orderStatus) {
+            errMsg('Order is already in this status');
+            return;
+        }
+        const formData = { status };
+        updateOrder(id, formData);
+    };
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'Processing': return { bg: '#ff9800', text: '#fff' }
-            case 'Shipped': return { bg: '#2196f3', text: '#fff' }
-            case 'Delivered': return { bg: '#4caf50', text: '#fff' }
-            case 'Cancelled': return { bg: '#f44336', text: '#fff' }
-            default: return { bg: '#757575', text: '#fff' }
+            case 'Processing': return { bg: '#ff9800', text: '#fff' };
+            case 'Shipped': return { bg: '#2196f3', text: '#fff' };
+            case 'Delivered': return { bg: '#4caf50', text: '#fff' };
+            case 'Cancelled': return { bg: '#f44336', text: '#fff' };
+            default: return { bg: '#757575', text: '#fff' };
         }
-    }
+    };
 
     const getStatusIcon = (status) => {
         switch (status) {
-            case 'Processing': return <HourglassEmpty />
-            case 'Shipped': return <LocalShipping />
-            case 'Delivered': return <CheckCircle />
-            case 'Cancelled': return <Cancel />
-            default: return <HourglassEmpty />
+            case 'Processing': return <HourglassEmpty />;
+            case 'Shipped': return <LocalShipping />;
+            case 'Delivered': return <CheckCircle />;
+            case 'Cancelled': return <Cancel />;
+            default: return <HourglassEmpty />;
         }
-    }
+    };
 
     const shippingDetails = shippingInfo && 
-        `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`
-    const isPaid = paymentInfo && paymentInfo.status === 'succeeded'
+        `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`;
+    const isPaid = paymentInfo && paymentInfo.status === 'succeeded';
 
-    if (loading) return <Loader />
+    if (loading) return <Loader />;
 
-    const statusColors = getStatusColor(orderStatus)
+    const statusColors = getStatusColor(orderStatus);
+    const allowedStatuses = getAllowedStatuses(orderStatus);
 
     return (
         <>
@@ -490,7 +515,7 @@ const ProcessOrder = () => {
                                             Update Status
                                         </Typography>
 
-                                        {orderStatus === 'Delivered' || orderStatus === 'Cancelled' ? (
+                                        {allowedStatuses.length === 0 ? (
                                             <Alert 
                                                 severity={orderStatus === 'Delivered' ? 'success' : 'error'}
                                                 sx={{ 
@@ -500,8 +525,8 @@ const ProcessOrder = () => {
                                                 }}
                                             >
                                                 {orderStatus === 'Delivered' 
-                                                    ? 'This order has been delivered' 
-                                                    : 'This order has been cancelled'}
+                                                    ? 'This order has been delivered. No further updates allowed.' 
+                                                    : 'This order has been cancelled. No further updates allowed.'}
                                             </Alert>
                                         ) : (
                                             <>
@@ -530,30 +555,17 @@ const ProcessOrder = () => {
                                                             '& .MuiSvgIcon-root': { color: '#999' }
                                                         }}
                                                     >
-                                                        <MenuItem value="Processing">
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <HourglassEmpty fontSize="small" />
-                                                                Processing
-                                                            </Box>
-                                                        </MenuItem>
-                                                        <MenuItem value="Shipped">
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <LocalShipping fontSize="small" />
-                                                                Shipped
-                                                            </Box>
-                                                        </MenuItem>
-                                                        <MenuItem value="Delivered">
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <CheckCircle fontSize="small" />
-                                                                Delivered
-                                                            </Box>
-                                                        </MenuItem>
-                                                        <MenuItem value="Cancelled">
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <Cancel fontSize="small" />
-                                                                Cancelled
-                                                            </Box>
-                                                        </MenuItem>
+                                                        {allowedStatuses.map((statusOption) => (
+                                                            <MenuItem key={statusOption} value={statusOption}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                    {statusOption === 'Processing' && <HourglassEmpty fontSize="small" />}
+                                                                    {statusOption === 'Shipped' && <LocalShipping fontSize="small" />}
+                                                                    {statusOption === 'Delivered' && <CheckCircle fontSize="small" />}
+                                                                    {statusOption === 'Cancelled' && <Cancel fontSize="small" />}
+                                                                    {statusOption}
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))}
                                                     </Select>
                                                 </FormControl>
 
@@ -621,7 +633,7 @@ const ProcessOrder = () => {
                 </div>
             </div>
         </>
-    )
-}
+    );
+};
 
-export default ProcessOrder
+export default ProcessOrder;

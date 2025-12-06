@@ -110,10 +110,14 @@
 }
 
 .content .buttons {
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
     padding: 0;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .input-group {
@@ -239,6 +243,7 @@
     margin-top: auto;
     padding-top: 20px;
     border-top: 1px solid var(--f1-border);
+    width: 100%;
 }
 
 .prime-button,
@@ -251,7 +256,8 @@
     cursor: pointer;
     transition: all 0.3s ease;
     font-size: 13px;
-    min-width: 140px;
+    flex: 1;
+    max-width: 100%;
     position: relative;
     overflow: hidden;
 }
@@ -308,10 +314,11 @@
 }
 
 .content .buttons .button {
-    display: inline-block;
+    display: block;
+    width: 100%;
     text-align: center;
     padding: 10px 15px;
-    margin: 10px;
+    margin: 10px 0;
     background-color: var(--f1-dark-gray);
     border-radius: 6px;
     box-shadow: 0 4px 15px rgba(220, 0, 0, 0.3);

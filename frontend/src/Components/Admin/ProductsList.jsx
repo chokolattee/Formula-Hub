@@ -544,33 +544,119 @@ const ProductList = () => {
   const exportToPDF = () => {
     const doc = new jsPDF();
 
-    doc.setFontSize(18);
-    doc.text('Products Report', 14, 22);
+    // Header with F1 theme
+    doc.setFillColor(220, 0, 0); // F1 Red
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255); // White text
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRODUCTS REPORT', 105, 18, { align: 'center' });
 
     doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-    doc.text(`Total Products: ${filteredData.length}`, 14, 36);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 26, { align: 'center' });
+    doc.text(`Total Products: ${filteredData.length}`, 105, 32, { align: 'center' });
 
+    // Summary section
+    doc.setTextColor(0, 0, 0); // Black text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRODUCT SUMMARY', 14, 50);
+
+    const totalValue = filteredData.reduce((sum, product) => sum + (product.price * product.stock), 0);
+    const totalStock = filteredData.reduce((sum, product) => sum + product.stock, 0);
+    const avgRating = (filteredData.reduce((sum, product) => sum + product.ratings, 0) / filteredData.length).toFixed(1);
+    const outOfStock = filteredData.filter(p => p.stock === 0).length;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Total Inventory Value: Php ${totalValue.toFixed(2)}`, 14, 58);
+    doc.text(`Total Stock: ${totalStock} units | Out of Stock: ${outOfStock} | Avg Rating: ${avgRating}/5`, 14, 64);
+
+    // Table data
     const tableData = filteredData.map(product => [
-      product._id.substring(0, 8) + '...',
-      product.name.substring(0, 20),
-      `₱${product.price}`,
-      product.category?.name || 'N/A',
-      product.stock,
-      product.ratings
+        product._id.substring(0, 10) + '...',
+        product.name.substring(0, 25),
+        `Php ${product.price.toFixed(2)}`,
+        product.category?.name || 'N/A',
+        product.stock.toString(),
+        product.ratings > 0 ? `${product.ratings}/5` : 'N/A'
     ]);
 
     autoTable(doc, {
-      head: [['Product ID', 'Name', 'Price', 'Category', 'Stock', 'Rating']],
-      body: tableData,
-      startY: 42,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [198, 40, 40] }
+        head: [['Product ID', 'Name', 'Price', 'Category', 'Stock', 'Rating']],
+        body: tableData,
+        startY: 72,
+        theme: 'grid',
+        styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            lineColor: [220, 0, 0],
+            lineWidth: 0.5
+        },
+        headStyles: {
+            fillColor: [220, 0, 0], // F1 Red
+            textColor: [255, 255, 255], // White
+            fontStyle: 'bold',
+            fontSize: 10,
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245] // Light gray
+        },
+        columnStyles: {
+            0: { cellWidth: 30, fontStyle: 'bold', fontSize: 8 },
+            1: { cellWidth: 60 },
+            2: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+            3: { cellWidth: 30, halign: 'center' },
+            4: { cellWidth: 20, halign: 'center' },
+            5: { cellWidth: 25, halign: 'center' }
+        },
+        didParseCell: function (data) {
+            // Color code stock cells
+            if (data.column.index === 4 && data.section === 'body') {
+                const stock = parseInt(data.cell.raw);
+                if (stock === 0) {
+                    data.cell.styles.textColor = [211, 47, 47]; // Red
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (stock < 10) {
+                    data.cell.styles.textColor = [255, 152, 0]; // Orange
+                    data.cell.styles.fontStyle = 'bold';
+                } else {
+                    data.cell.styles.textColor = [76, 175, 80]; // Green
+                }
+            }
+            // Color code ratings
+            if (data.column.index === 5 && data.section === 'body') {
+                const rating = parseFloat(data.cell.raw);
+                if (rating >= 4) {
+                    data.cell.styles.textColor = [76, 175, 80]; // Green
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (rating >= 3) {
+                    data.cell.styles.textColor = [255, 152, 0]; // Orange
+                }
+            }
+        }
     });
 
-    doc.save(`products_${new Date().toISOString().split('T')[0]}.pdf`);
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+            `Page ${i} of ${pageCount} | FormulaHub Products Report`,
+            105,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+        );
+    }
+
+    doc.save(`formulahub_products_${new Date().toISOString().split('T')[0]}.pdf`);
     alert('Products exported to PDF');
-  };
+};
 
   // PrimeReact Templates
   const rowExpansionTemplate = (data) => {

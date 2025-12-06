@@ -324,35 +324,120 @@ const Reviews = () => {
 
     // Export to PDF
     const exportToPDF = () => {
-        const doc = new jsPDF();
-        
-        doc.setFontSize(18);
-        doc.text('Reviews Report', 14, 22);
-        
-        doc.setFontSize(11);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-        doc.text(`Total Reviews: ${filteredReviews.length}`, 14, 36);
-        
-        const tableData = filteredReviews.map(review => [
-            review._id.substring(0, 8) + '...',
-            review.product?.name?.substring(0, 20) || 'N/A',
-            `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim().substring(0, 20) || 'N/A',
-            review.rating,
-            review.comment?.substring(0, 30) || 'N/A',
-            new Date(review.createdAt).toLocaleDateString()
-        ]);
-        
-        autoTable(doc, {
-            head: [['Review ID', 'Product', 'User', 'Rating', 'Comment', 'Date']],
-            body: tableData,
-            startY: 42,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [198, 40, 40] }
-        });
-        
-        doc.save(`reviews_${new Date().toISOString().split('T')[0]}.pdf`);
-        successMsg('Reviews exported to PDF');
-    };
+    const doc = new jsPDF();
+
+    // Header with F1 theme
+    doc.setFillColor(220, 0, 0); // F1 Red
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255); // White text
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REVIEWS REPORT', 105, 18, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 26, { align: 'center' });
+    doc.text(`Total Reviews: ${filteredReviews.length}`, 105, 32, { align: 'center' });
+
+    // Summary section
+    doc.setTextColor(0, 0, 0); // Black text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REVIEW SUMMARY', 14, 50);
+
+    const avgRating = filteredReviews.length > 0
+        ? (filteredReviews.reduce((sum, r) => sum + r.rating, 0) / filteredReviews.length).toFixed(1)
+        : 0;
+    const fiveStars = filteredReviews.filter(r => r.rating === 5).length;
+    const fourStars = filteredReviews.filter(r => r.rating === 4).length;
+    const threeStars = filteredReviews.filter(r => r.rating === 3).length;
+    const twoStars = filteredReviews.filter(r => r.rating === 2).length;
+    const oneStar = filteredReviews.filter(r => r.rating === 1).length;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Average Rating: ${avgRating}/5.0`, 14, 58);
+    doc.text(`5★: ${fiveStars} | 4★: ${fourStars} | 3★: ${threeStars} | 2★: ${twoStars} | 1★: ${oneStar}`, 14, 64);
+
+    // Table data
+    const tableData = filteredReviews.map(review => [
+        review._id.substring(0, 10) + '...',
+        review.product?.name?.substring(0, 20) || 'N/A',
+        `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim().substring(0, 20) || 'N/A',
+        `${review.rating}/5`,
+        review.comment?.substring(0, 35) || 'N/A',
+        new Date(review.createdAt).toLocaleDateString()
+    ]);
+
+    autoTable(doc, {
+        head: [['Review ID', 'Product', 'User', 'Rating', 'Comment', 'Date']],
+        body: tableData,
+        startY: 72,
+        theme: 'grid',
+        styles: {
+            fontSize: 8,
+            cellPadding: 3,
+            lineColor: [220, 0, 0],
+            lineWidth: 0.5
+        },
+        headStyles: {
+            fillColor: [220, 0, 0], // F1 Red
+            textColor: [255, 255, 255], // White
+            fontStyle: 'bold',
+            fontSize: 9,
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245] // Light gray
+        },
+        columnStyles: {
+            0: { cellWidth: 28, fontStyle: 'bold', fontSize: 7 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 30 },
+            3: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+            4: { cellWidth: 50, fontSize: 7 },
+            5: { cellWidth: 24, halign: 'center' }
+        },
+        didParseCell: function (data) {
+            // Color code rating cells
+            if (data.column.index === 3 && data.section === 'body') {
+                const rating = parseInt(data.cell.raw);
+                if (rating === 5) {
+                    data.cell.styles.textColor = [76, 175, 80]; // Green
+                    data.cell.styles.fillColor = [200, 230, 201]; // Light green background
+                } else if (rating === 4) {
+                    data.cell.styles.textColor = [139, 195, 74]; // Light green
+                } else if (rating === 3) {
+                    data.cell.styles.textColor = [255, 152, 0]; // Orange
+                } else if (rating === 2) {
+                    data.cell.styles.textColor = [255, 87, 34]; // Deep orange
+                } else if (rating === 1) {
+                    data.cell.styles.textColor = [244, 67, 54]; // Red
+                    data.cell.styles.fillColor = [255, 205, 210]; // Light red background
+                }
+            }
+        }
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+            `Page ${i} of ${pageCount} | FormulaHub Reviews Report`,
+            105,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+        );
+    }
+
+    doc.save(`formulahub_reviews_${new Date().toISOString().split('T')[0]}.pdf`);
+    successMsg('Reviews exported to PDF');
+};
+
 
     // PrimeReact Templates
     const rowExpansionTemplate = (data) => {

@@ -24,6 +24,9 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
     const [loadingReviews, setLoadingReviews] = useState(false)
     const [ratingCounts, setRatingCounts] = useState({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 })
 
+    let { id } = useParams()
+    let navigate = useNavigate()
+
     const openImageGallery = (images, startIndex) => {
         setGalleryImages(images);
         setGalleryStartIndex(startIndex);
@@ -32,9 +35,6 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
     const closeImageGallery = () => {
         setGalleryImages(null);
     };
-
-    let { id } = useParams()
-    let navigate = useNavigate()
 
     const increaseQty = () => {
         if (quantity >= product.stock) return;
@@ -56,6 +56,12 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
         if (product.images && product.images.length > 0) {
             setSelectedImage((prev) => (prev - 1 + product.images.length) % product.images.length)
         }
+    }
+
+    const handleLoginRedirect = () => {
+        navigate('/login', { 
+            state: { from: window.location.pathname }
+        });
     }
 
     const fetchReviews = async (productId) => {
@@ -277,18 +283,28 @@ const ProductDetails = ({ addItemToCart, cartItems, loggedUser: user }) => {
                                 </div>
 
                                 {/* Add to Cart Button */}
-                                <button
-                                    className="add-to-cart-btn"
-                                    disabled={!loggedUser || product.stock === 0}
-                                    onClick={addToCart}
-                                >
-                                    {product.stock === 0
-                                        ? 'OUT OF STOCK'
-                                        : !loggedUser
-                                            ? 'LOGIN TO ADD TO CART'
-                                            : 'Add to Cart'
-                                    }
-                                </button>
+                                {product.stock === 0 ? (
+                                    <button
+                                        className="add-to-cart-btn"
+                                        disabled
+                                    >
+                                        OUT OF STOCK
+                                    </button>
+                                ) : !loggedUser ? (
+                                    <button
+                                        className="add-to-cart-btn login-redirect-btn"
+                                        onClick={handleLoginRedirect}
+                                    >
+                                        LOGIN TO ADD TO CART
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="add-to-cart-btn"
+                                        onClick={addToCart}
+                                    >
+                                        Add to Cart
+                                    </button>
+                                )}
 
                                 {/* Description Accordion */}
                                 <div className="accordion-section">

@@ -174,36 +174,120 @@ const Users = () => {
     };
 
     // Export to PDF
-    const exportToPDF = () => {
-        const doc = new jsPDF();
-        
-        doc.setFontSize(18);
-        doc.text('Users Report', 14, 22);
-        
-        doc.setFontSize(11);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-        doc.text(`Total Users: ${filteredUsers.length}`, 14, 36);
-        
-        const tableData = filteredUsers.map(user => [
-            user._id.substring(0, 8) + '...',
-            `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A',
-            user.email || 'N/A',
-            user.role,
-            user.status,
-            new Date(user.createdAt).toLocaleDateString()
-        ]);
-        
-        autoTable(doc, {
-            head: [['User ID', 'Name', 'Email', 'Role', 'Status', 'Created']],
-            body: tableData,
-            startY: 42,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [198, 40, 40] }
-        });
-        
-        doc.save(`users_${new Date().toISOString().split('T')[0]}.pdf`);
-        alert('Users exported to PDF');
-    };
+   const exportToPDF = () => {
+    const doc = new jsPDF();
+
+    // Header with F1 theme
+    doc.setFillColor(220, 0, 0); // F1 Red
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setTextColor(255, 255, 255); // White text
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('USERS REPORT', 105, 18, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 26, { align: 'center' });
+    doc.text(`Total Users: ${filteredUsers.length}`, 105, 32, { align: 'center' });
+
+    // Summary section
+    doc.setTextColor(0, 0, 0); // Black text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('USER SUMMARY', 14, 50);
+
+    const adminCount = filteredUsers.filter(u => u.role === 'admin').length;
+    const userCount = filteredUsers.filter(u => u.role === 'user').length;
+    const activeCount = filteredUsers.filter(u => u.status === 'active').length;
+    const deactivatedCount = filteredUsers.filter(u => u.status === 'deactivated').length;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Admins: ${adminCount} | Users: ${userCount}`, 14, 58);
+    doc.text(`Active: ${activeCount} | Deactivated: ${deactivatedCount}`, 14, 64);
+
+    // Table data
+    const tableData = filteredUsers.map(user => [
+        user._id.substring(0, 10) + '...',
+        `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A',
+        user.email || 'N/A',
+        user.role,
+        user.status,
+        new Date(user.createdAt).toLocaleDateString()
+    ]);
+
+    autoTable(doc, {
+        head: [['User ID', 'Name', 'Email', 'Role', 'Status', 'Created']],
+        body: tableData,
+        startY: 72,
+        theme: 'grid',
+        styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            lineColor: [220, 0, 0],
+            lineWidth: 0.5
+        },
+        headStyles: {
+            fillColor: [220, 0, 0], // F1 Red
+            textColor: [255, 255, 255], // White
+            fontStyle: 'bold',
+            fontSize: 10,
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245] // Light gray
+        },
+        columnStyles: {
+            0: { cellWidth: 30, fontStyle: 'bold', fontSize: 8 },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 50 },
+            3: { cellWidth: 25, halign: 'center' },
+            4: { cellWidth: 25, halign: 'center' },
+            5: { cellWidth: 25, halign: 'center' }
+        },
+        didParseCell: function (data) {
+            // Color code role cells
+            if (data.column.index === 3 && data.section === 'body') {
+                const role = data.cell.raw;
+                if (role === 'admin') {
+                    data.cell.styles.textColor = [220, 0, 0]; // Red
+                    data.cell.styles.fontStyle = 'bold';
+                } else {
+                    data.cell.styles.textColor = [33, 150, 243]; // Blue
+                }
+            }
+            // Color code status cells
+            if (data.column.index === 4 && data.section === 'body') {
+                const status = data.cell.raw;
+                if (status === 'active') {
+                    data.cell.styles.textColor = [76, 175, 80]; // Green
+                    data.cell.styles.fontStyle = 'bold';
+                } else {
+                    data.cell.styles.textColor = [158, 158, 158]; // Gray
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+            `Page ${i} of ${pageCount} | FormulaHub Users Report`,
+            105,
+            doc.internal.pageSize.height - 10,
+            { align: 'center' }
+        );
+    }
+
+    doc.save(`formulahub_users_${new Date().toISOString().split('T')[0]}.pdf`);
+    alert('Users exported to PDF');
+};
 
     // Reset form state
     const resetFormState = () => {
